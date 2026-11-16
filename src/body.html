@@ -1,0 +1,141 @@
+<div id="wrap">
+  <aside id="side">
+    <div class="head"><span>MOVE LIST</span><span id="sideMode"></span></div>
+    <div class="scroll" id="sideScroll">
+      <div id="cards"></div>
+    </div>
+    <div id="sci" role="status" aria-live="polite"><div class="t">SCIENCE CHECK</div><div class="n" id="sciN">Organelle Rangers</div><p id="sciP">Every special move in this game is based on a real job a part of the cell does. When a move is used, its science shows up here.</p></div>
+  </aside>
+  <main id="gameArea">
+    <div id="screen">
+      <div id="hud" hidden>
+        <div class="bars">
+          <div class="pbar l" id="pb0"><div class="port" id="port0"></div><div class="info"><div class="name"><span id="nm0"></span><span class="pips" id="pips0"><b></b><b></b></span></div><div class="hp" id="hp0"><i class="gh"></i><i class="fill"></i></div></div></div>
+          <div class="tcol"><div class="timer" id="timer">99</div><button id="pauseBtn" type="button">❚❚ PAUSE</button></div>
+          <div class="pbar r" id="pb1"><div class="port" id="port1"></div><div class="info"><div class="name"><span class="pips" id="pips1"><b></b><b></b></span><span id="nm1"></span></div><div class="hp" id="hp1"><i class="gh"></i><i class="fill"></i></div></div></div>
+        </div>
+        <div class="combo l" id="combo0"></div><div class="combo r" id="combo1"></div>
+        <div class="toast l" id="toast0"></div><div class="toast r" id="toast1"></div>
+        <div class="meters"><div class="meter l" id="mt0"><div class="lbl">MEGAFORM</div><div class="mbar"><i></i><s style="left:25%"></s><s style="left:50%"></s><s style="left:75%"></s></div></div><div class="meter r" id="mt1"><div class="lbl">MEGAFORM</div><div class="mbar"><i></i><s style="left:25%"></s><s style="left:50%"></s><s style="left:75%"></s></div></div></div>
+        <div id="pops"></div>
+      </div>
+      <div id="banner"></div>
+      <div id="loading" class="loading">LOADING RANGERS…</div>
+      <div id="announce"></div>
+      <div id="introCap"></div><div id="introName"></div><div id="skipHint" hidden>PRESS ANY KEY TO SKIP</div><div id="wipe"></div><div id="fade"></div><div class="lb t"></div><div class="lb b"></div>
+      <!-- logo / press start -->
+      <div class="menu" id="press" hidden>
+        <div class="logo2"><div class="l0">★ JOHNSTON BIO ARCADE PRESENTS ★</div><div class="l1">ORGANELLE</div><div class="l2"><span>RANGERS</span><span class="three">3</span></div><div class="l3">DEFENDERS OF THE CELL</div><div class="pips" id="logoPips"></div></div>
+        <div class="blinker big">PRESS START</div>
+        <div class="hintline kb">ENTER · SPACE · Z</div>
+      </div>
+      <!-- main menu -->
+      <div class="menu side" id="title" hidden>
+        <div class="logo2 small"><div class="l1">ORGANELLE</div><div class="l2"><span>RANGERS</span><span class="three">3</span></div></div>
+        <div class="mlist" id="mainList">
+          <button class="mbtn" data-go="arcade"><b>SINGLE PLAYER</b><small>Climb the tower. Stop the Phage.</small></button>
+          <button class="mbtn" data-go="training"><b>TRAINING</b><small>Practice with a full Megaform meter</small></button>
+          <button class="mbtn" data-go="settings"><b>SETTINGS</b><small>Sound and screen filters</small></button>
+          <button class="mbtn" data-go="intro"><b>WATCH INTRO</b><small>The movie</small></button>
+        </div>
+        <div class="hintline kb">↑ ↓ TO CHOOSE · ENTER OR Z TO SELECT</div>
+      </div>
+      <!-- difficulty -->
+      <div class="menu" id="diff" hidden>
+        <div class="card"><h2>CHOOSE DIFFICULTY</h2>
+          <div class="mlist" id="diffList" style="margin:1cqw auto 0">
+            <button class="mbtn" data-d="0"><b>EASY</b><small>Stupidly easy. Learn the moves.</small></button>
+            <button class="mbtn" data-d="1"><b>MEDIUM</b><small>Somewhat of a challenge</small></button>
+            <button class="mbtn" data-d="2"><b>HARD</b><small>A decent challenge</small></button>
+          </div><p class="towernote">6 rangers stand between you and the final boss.</p></div>
+      </div>
+      <!-- settings -->
+      <div class="menu" id="settings" hidden>
+        <div class="card"><h2>SETTINGS</h2>
+          <div class="mlist" id="setList" style="margin:1cqw auto 0">
+            <button class="mbtn" data-set="sound">SOUND <small id="sSound"></small></button>
+            <button class="mbtn" data-set="pixel">ARCADE PIXEL FILTER <small id="sPixel"></small></button>
+            <button class="mbtn" data-set="scan">CRT SCANLINES <small id="sScan"></small></button>
+            
+            <button class="mbtn" data-set="back">BACK</button>
+          </div></div>
+      </div>
+      <!-- character select -->
+      <div class="menu" id="sel" hidden>
+        <div class="seltitle">SELECT YOUR RANGER</div>
+        <div class="pname l" id="selN0"></div><div class="pname r" id="selN1"></div>
+        <div class="grid" id="grid"></div>
+        <div class="selhint" id="selHint"></div>
+      </div>
+      <!-- stage select -->
+      <div class="menu" id="stagesel" hidden>
+        <div class="seltitle">CHOOSE YOUR ARENA</div>
+        <div class="stages" id="stages"></div>
+        <div class="selhint">A/D OR ←/→ TO CHOOSE · F OR ENTER TO FIGHT · ESC TO GO BACK</div>
+      </div>
+      <!-- pause -->
+      <div class="menu res" id="pause" hidden><div class="card"><h2>PAUSED</h2><div class="mlist" id="pauseList" style="margin:0 auto"><button class="mbtn" data-p="resume">RESUME</button><button class="mbtn" data-p="dummy">TRAINING DUMMY: <small id="dumMode"></small></button><button class="mbtn" data-p="moves">MOVE LIST</button><button class="mbtn" data-p="select">CHARACTER SELECT</button><button class="mbtn" data-p="menu">MAIN MENU</button></div></div></div>
+      <!-- results -->
+      <div class="menu res" id="results" hidden><div class="card"><h2 id="resT"></h2><div class="tower" id="towerRow"></div><p id="resP"></p><div class="mlist" id="resList" style="margin:0 auto"></div></div></div>
+      <div id="movie"><video id="movieVid" playsinline preload="auto"></video>
+        <div id="movieTap"><div class="mt0">★ JOHNSTON BIO ARCADE PRESENTS ★</div><div class="mt1">ORGANELLE RANGERS 3</div><div class="blinker big" id="movieTapTxt">CLICK OR PRESS ANY KEY</div><div class="mt2">TURN YOUR SOUND ON</div></div>
+        <div id="movieSkip" hidden>PRESS ANY KEY TO SKIP</div>
+      </div>
+      <div id="scan"></div>
+    </div>
+  </main>
+  <div id="pad" hidden>
+    <div id="dpad"><i class="u"></i><i class="d"></i><i class="l"></i><i class="r"></i><b></b></div>
+    <div id="padMid"><button class="pill" data-k="Escape">PAUSE</button></div>
+    <div id="btns">
+      <button class="ab mega" data-k="Space">MEGA</button>
+      <button class="ab sp" data-k="KeyZ,KeyX">SP</button>
+      <button class="ab b" data-k="KeyX">B<small>KICK</small></button>
+      <button class="ab a" data-k="KeyZ">A<small>PUNCH</small></button>
+    </div>
+  </div>
+  <div id="movesOv" hidden><div class="movesbox"><div id="movesIn"></div><button id="movesBack">BACK</button></div></div>
+</div>
+<script>
+/* Intro movie: starts streaming while the rest of the game downloads; plays on the first click / key / tap
+   (browsers only allow sound after one), and the game loads its rangers in the background meanwhile. */
+var MOVIE = (function () {
+  var Q = new URLSearchParams(location.search), ua = navigator.userAgent;
+  var lite = Q.has("hq") ? false : Q.has("lite") ? true : (/CrOS|Android|iPhone|iPad|Mobi/.test(ua) || (navigator.hardwareConcurrency || 8) <= 4);
+  var touch = Q.has("touch") || (!Q.has("nopad") && (matchMedia("(pointer: coarse)").matches || "ontouchstart" in window) && /Android|iPhone|iPad|iPod|Mobi|Silk/.test(ua + (navigator.maxTouchPoints > 1 ? " iPad" : "")));
+  if (touch) { document.body.classList.add("touch"); document.getElementById("pad").hidden = false; }
+  var el = document.getElementById("movie"), v = document.getElementById("movieVid"), tap = document.getElementById("movieTap"), skip = document.getElementById("movieSkip");
+  var M = { state: "tap", onEnd: null, t0: 0, failed: false };
+  if (touch) { document.getElementById("movieTapTxt").textContent = "TAP TO START"; skip.textContent = "TAP TO SKIP"; }
+  if (Q.has("nomovie")) { M.state = "done"; el.hidden = true; return M; }
+  v.src = lite ? "video/intro_sd.mp4" : "video/intro.mp4";
+  var buffered = new Promise(function (res) { v.addEventListener("canplaythrough", res, { once: true }); v.addEventListener("error", res, { once: true }); });
+  var doneRes, done = new Promise(function (r) { doneRes = r; });
+  M.whenBuffered = function (ms) { return Promise.race([buffered, done, new Promise(function (r) { setTimeout(r, ms); })]); };
+  function start() {
+    M.state = "play"; M.t0 = performance.now(); tap.hidden = true; el.hidden = false; el.classList.remove("out");
+    if (M.failed) return finish();
+    try { v.currentTime = 0; } catch (_) {}
+    v.muted = false; var p = v.play();
+    if (p && p.catch) p.catch(function () { v.muted = true; v.play().catch(finish); });
+    setTimeout(function () { if (M.state === "play") skip.hidden = false; }, 1500);
+  }
+  function finish() {
+    if (M.state === "done") return; M.state = "done"; doneRes(); try { v.pause(); } catch (_) {} skip.hidden = true;
+    el.classList.add("out"); setTimeout(function () { if (M.state === "done") el.hidden = true; }, 450);
+    if (M.onEnd) { var f = M.onEnd; M.onEnd = null; f(); }
+  }
+  function input(e) {
+    if (el.hidden || M.state === "done") return;
+    if (e.type === "keydown" && (e.repeat || /^(Shift|Control|Alt|Meta|Tab)/.test(e.key))) return;
+    if (M.state === "tap") start(); else if (performance.now() - M.t0 > 700) finish();
+    e.stopPropagation(); if (e.type === "keydown") e.preventDefault();
+  }
+  addEventListener("keydown", input, true); addEventListener("pointerdown", input, true);
+  v.addEventListener("ended", finish);
+  v.addEventListener("error", function () { M.failed = true; if (M.state === "play") finish(); });
+  /* replay from the menu (called inside a click / key press, so sound is allowed) */
+  M.replay = function (onEnd) { M.onEnd = onEnd; start(); };
+  return M;
+})();
+</script>

@@ -35,11 +35,11 @@ class PlayerCtrl {
   constructor() { this.prev = {}; this.pend = { punch: 0, kick: 0 }; this.cur = {}; this.pressed = {}; }
   read(game, me) {
     const K = (...c) => c.some((k) => KEYS.has(k));
-    const raw = { left: K("ArrowLeft"), right: K("ArrowRight"), up: K("ArrowUp"), down: K("ArrowDown"), punch: K("KeyZ", "KeyA"), kick: K("KeyX", "KeyS"), ult: K("Space") };
+    const raw = { left: K("ArrowLeft"), right: K("ArrowRight"), up: K("ArrowUp"), down: K("ArrowDown"), punch: K("KeyZ", "KeyA", "PadPunch"), kick: K("KeyX", "KeyS", "PadKick"), ult: K("Space", "PadUlt"), special: K("PadSpecial") };
     const edge = {}; for (const k in raw) edge[k] = raw[k] && !this.prev[k]; this.prev = raw;
     const c = { left: raw.left, right: raw.right, up: raw.up, down: raw.down, ult: raw.ult }, pr = { up: edge.up, ult: edge.ult };
     if (edge.punch) this.pend.punch = 4; if (edge.kick) this.pend.kick = 4;
-    if ((this.pend.punch > 0 && this.pend.kick > 0) || (edge.punch && raw.kick) || (edge.kick && raw.punch)) { pr.special = c.special = true; this.pend.punch = this.pend.kick = 0; }
+    if (edge.special || (this.pend.punch > 0 && this.pend.kick > 0) || (edge.punch && raw.kick) || (edge.kick && raw.punch)) { pr.special = c.special = true; this.pend.punch = this.pend.kick = 0; }
     else for (const b of ["punch", "kick"]) if (this.pend[b] > 0 && --this.pend[b] === 0) pr[b] = c[b] = true;
     if (me && game && game.proj) { const away = me.face > 0 ? "left" : "right"; if (raw[away]) { const o = me.opp;
         const threat = (o.state === "attack" && o.move && Math.abs(o.x - me.x) < (o.move.special ? 7 : 2.6)) || game.proj.some((p) => p.owner !== me.slot && Math.abs(p.x - me.x) < 4 && Math.sign(p.vx) === Math.sign(me.x - p.x));
@@ -239,6 +239,7 @@ class Game {
     att.meter = Math.min(100, att.meter + dmg * 0.9); def.meter = Math.min(100, def.meter + dmg * 0.55);
     this.parts.hit(at, att.info.hex, mv.big || (dmg >= 10 ? 1.4 : 1)); this.hitstop = mv.hitstop ?? (dmg >= 10 ? 8 : 5); this.view.shake = Math.max(this.view.shake, dmg >= 10 ? 0.22 : 0.1);
     this.sfx(mv.sfx || "hit"); def.flash = 0.08; def.lowHit = mv.level === "low";
+    if (typeof PAD !== "undefined") PAD.rumble(def.slot === 0 ? (dmg >= 10 ? 0.9 : 0.5) : (dmg >= 10 ? 0.35 : 0.15), dmg >= 10 ? 200 : 90);
     if (this.phase !== "fight") return "hit";
     if (mv.launch || !def.grounded) { def.tripped = false; def.set("air"); def.vx = dir * (mv.launch ? mv.launch[0] : 2.5); def.vy = mv.launch ? mv.launch[1] : 6.5; def.y = Math.max(def.y, 0.01); }
     else if (mv.trip) { def.tripped = true; def.set("trip"); def.vy = 4.5; def.y = 0.01; def.vx = dir * 1.2; }

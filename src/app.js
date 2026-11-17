@@ -83,7 +83,15 @@ const HUD = {
 
 /* ---------- side column ---------- */
 const KEYLBL = [{ left: "A", right: "D", up: "W", down: "S", punch: "F", kick: "G", special: "H", block: "R", ult: "T" }, { left: "←", right: "→", up: "↑", down: "↓", punch: "K", kick: "L", special: ";", block: "O", ult: "P" }];
+// button labels for whichever device was used last (keyboard, touch pad or game controller)
+const GPK = (b) => `<kbd class="gp ${b.toLowerCase()}">${b}</kbd>`;
+function refreshHints() {
+  if (sideCards.last) sideCards(sideCards.last);
+  if (typeof APP !== "undefined" && APP.mode === "select") APP.selHintText && APP.selHintText();
+  if (!$id("movesOv").hidden) $id("movesIn").innerHTML = $id("cards").innerHTML;
+}
 function sideCards(entries) {
+  sideCards.last = entries;
   $id("cards").innerHTML = entries.map(({ id, slot, cpu }) => {
     const info = BYID[id], m = MOVES[id]; const dk = { "": "", fwd: "<kbd>→</kbd>", down: "<kbd>↓</kbd>", back: "<kbd>←</kbd>" };
     return `<div class="pcard" style="--c:${info.hex}"><h3>${info.name}</h3><div class="who">${cpu ? (info.boss ? "FINAL BOSS" : "OPPONENT") : "YOU"} · ${info.style.toUpperCase()}</div>
@@ -95,6 +103,7 @@ function sideCards(entries) {
       ${m.specials.map((s) => `<span class="k">${cpu ? "" : dk[s.dir] + "<kbd>Z</kbd>+<kbd>X</kbd>"}</span><span class="sp" data-mv="${slot}:${s.name}">${s.name}</span><span class="sub">${s.desc}</span>`).join("")}
       <span class="k">${cpu ? "" : "<kbd>SPACE</kbd>"}</span><span class="sp ult" data-mv="${slot}:${m.ult.name}">${m.ult.name}</span><span class="sub">${cpu ? "Megaform ultimate." : "Megaform. Fill the meter, then press SPACE up close."}</span>
     </div></div>`; }).join("");
+  if (typeof PAD !== "undefined" && PAD.active) { const c = $id("cards"); c.innerHTML = c.innerHTML.replaceAll("<kbd>Z</kbd>+<kbd>X</kbd>", GPK("X")).replaceAll("<kbd>Z</kbd>", GPK("A")).replaceAll("<kbd>X</kbd>", GPK("B")).replaceAll("<kbd>SPACE</kbd>", GPK("Y")).replaceAll("press SPACE", "press Y").replaceAll("<kbd>←</kbd><kbd>→</kbd>", "<kbd>STICK</kbd>"); return; }
   if (TOUCH) { const c = $id("cards"); c.innerHTML = c.innerHTML.replaceAll("<kbd>Z</kbd>+<kbd>X</kbd>", "<kbd>SP</kbd>").replaceAll("<kbd>Z</kbd>", "<kbd>A</kbd>").replaceAll("<kbd>X</kbd>", "<kbd>B</kbd>").replaceAll("<kbd>SPACE</kbd>", "<kbd>MEGA</kbd>").replaceAll("press SPACE", "press MEGA"); }
 }
 
@@ -151,7 +160,7 @@ const APP = {
     const a = ROSTER[this.cursor[0]]; SHOW.picks = [a.id, null];
     const el = $id("selN0"); el.style.setProperty("--c", a.hex); el.innerHTML = `${a.name.toUpperCase()}<small>${a.color.toUpperCase()} · ${a.style.toUpperCase()}${this.locked[0] ? " · READY" : ""}</small>`;
     const er = $id("selN1"); er.style.setProperty("--c", a.hex); er.innerHTML = `<small>MEGAFORM</small>${MOVES[a.id].ult.name.toUpperCase()}`;
-    $id("selHint").textContent = TOUCH ? "TAP A RANGER TO VIEW · TAP AGAIN TO LOCK IN" : "CLICK OR ARROWS TO VIEW · CLICK AGAIN, ENTER OR Z TO LOCK IN · ESC: BACK";
+    this.selHintText();
     sideCards([{ id: a.id, slot: 0 }]);
   },
   lockPick(p) {
@@ -195,6 +204,7 @@ const APP = {
   },
   resGo(r) { AUDIO.sfx("confirm"); if (r === "next") { this.tower.i++; this.picks[1] = this.tower.list[this.tower.i]; return this.startFight(towerStage(this.tower.i, this.picks[1])); } if (r === "again") return this.startFight(this.lastStage); if (r === "select") return this.toSelect(); this.toTitle(); },
   /* ---------- keyboard navigation for menus ---------- */
+  selHintText() { $id("selHint").textContent = typeof PAD !== "undefined" && PAD.active ? "STICK OR D-PAD TO VIEW · A TO LOCK IN · B: BACK" : TOUCH ? "TAP A RANGER TO VIEW · TAP AGAIN TO LOCK IN" : "CLICK OR ARROWS TO VIEW · CLICK AGAIN, ENTER OR Z TO LOCK IN · ESC: BACK"; },
   key(e) {
     const c = e.code; const up = c === "ArrowUp", dn = c === "ArrowDown", lf = c === "ArrowLeft", rt = c === "ArrowRight";
     const ok = c === "Enter" || c === "KeyZ" || c === "Space", back = c === "Escape" || c === "Backspace";

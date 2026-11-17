@@ -213,6 +213,9 @@ body.cine #introCap{bottom:11%} body.cine #introName{bottom:12%}
 #movesBack{font-family:var(--bn);font-size:24px;letter-spacing:.08em;padding:10px;border:0;background:linear-gradient(90deg,#c8a012,#ff7a18);color:#fff}
 [data-p="moves"]{display:none}
 /* ---------- touch layout: screen on top, GBA-style pad underneath ---------- */
+.gpad{display:none} body.pad .kb{display:none} body.pad .gpad{display:block}
+kbd.gp,.gpb{display:inline-grid;place-items:center;min-width:1.5em;height:1.5em;padding:0;border-radius:50%;font-weight:900;color:#0b0b14;border:0}
+kbd.gp.a,.gpb.a{background:#5fd35a} kbd.gp.b,.gpb.b{background:#ff5a5a} kbd.gp.x,.gpb.x{background:#3fa4ff} kbd.gp.y,.gpb.y{background:#ffd21f}
 body.touch{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 body.touch #side{display:none} body.touch .kb{display:none} body.touch [data-p="moves"]{display:flex}
 body.touch #wrap{display:flex;flex-direction:column;height:100dvh;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}
@@ -279,7 +282,7 @@ body.touch #selHint,body.touch .hintline{font-size:1.5cqw}
       <div class="menu" id="press" hidden>
         <div class="logo2"><div class="l0">★ JOHNSTON BIO ARCADE PRESENTS ★</div><div class="l1">ORGANELLE</div><div class="l2"><span>RANGERS</span><span class="three">3</span></div><div class="l3">DEFENDERS OF THE CELL</div><div class="pips" id="logoPips"></div></div>
         <div class="blinker big">PRESS START</div>
-        <div class="hintline kb">ENTER · SPACE · Z</div>
+        <div class="hintline kb">ENTER · SPACE · Z</div><div class="hintline gpad">PRESS <b class="gpb a">A</b> OR START</div>
       </div>
       <!-- main menu -->
       <div class="menu side" id="title" hidden>
@@ -290,7 +293,7 @@ body.touch #selHint,body.touch .hintline{font-size:1.5cqw}
           <button class="mbtn" data-go="settings"><b>SETTINGS</b><small>Sound and screen filters</small></button>
           <button class="mbtn" data-go="intro"><b>WATCH INTRO</b><small>The movie</small></button>
         </div>
-        <div class="hintline kb">↑ ↓ TO CHOOSE · ENTER OR Z TO SELECT</div>
+        <div class="hintline kb">↑ ↓ TO CHOOSE · ENTER OR Z TO SELECT</div><div class="hintline gpad">STICK OR D-PAD TO CHOOSE · <b class="gpb a">A</b> SELECT · <b class="gpb b">B</b> BACK</div>
       </div>
       <!-- difficulty -->
       <div class="menu" id="diff" hidden>
@@ -323,7 +326,7 @@ body.touch #selHint,body.touch .hintline{font-size:1.5cqw}
       <div class="menu" id="stagesel" hidden>
         <div class="seltitle">CHOOSE YOUR ARENA</div>
         <div class="stages" id="stages"></div>
-        <div class="selhint">A/D OR ←/→ TO CHOOSE · F OR ENTER TO FIGHT · ESC TO GO BACK</div>
+        <div class="selhint kb">A/D OR ←/→ TO CHOOSE · F OR ENTER TO FIGHT · ESC TO GO BACK</div><div class="selhint gpad">STICK OR D-PAD TO CHOOSE · A TO FIGHT · B TO GO BACK</div>
       </div>
       <!-- pause -->
       <div class="menu res" id="pause" hidden><div class="card"><h2>PAUSED</h2><div class="mlist" id="pauseList" style="margin:0 auto"><button class="mbtn" data-p="resume">RESUME</button><button class="mbtn" data-p="dummy">TRAINING DUMMY: <small id="dumMode"></small></button><button class="mbtn" data-p="moves">MOVE LIST</button><button class="mbtn" data-p="select">CHARACTER SELECT</button><button class="mbtn" data-p="menu">MAIN MENU</button></div></div></div>
@@ -1603,11 +1606,11 @@ class PlayerCtrl {
   constructor() { this.prev = {}; this.pend = { punch: 0, kick: 0 }; this.cur = {}; this.pressed = {}; }
   read(game, me) {
     const K = (...c) => c.some((k) => KEYS.has(k));
-    const raw = { left: K("ArrowLeft"), right: K("ArrowRight"), up: K("ArrowUp"), down: K("ArrowDown"), punch: K("KeyZ", "KeyA"), kick: K("KeyX", "KeyS"), ult: K("Space") };
+    const raw = { left: K("ArrowLeft"), right: K("ArrowRight"), up: K("ArrowUp"), down: K("ArrowDown"), punch: K("KeyZ", "KeyA", "PadPunch"), kick: K("KeyX", "KeyS", "PadKick"), ult: K("Space", "PadUlt"), special: K("PadSpecial") };
     const edge = {}; for (const k in raw) edge[k] = raw[k] && !this.prev[k]; this.prev = raw;
     const c = { left: raw.left, right: raw.right, up: raw.up, down: raw.down, ult: raw.ult }, pr = { up: edge.up, ult: edge.ult };
     if (edge.punch) this.pend.punch = 4; if (edge.kick) this.pend.kick = 4;
-    if ((this.pend.punch > 0 && this.pend.kick > 0) || (edge.punch && raw.kick) || (edge.kick && raw.punch)) { pr.special = c.special = true; this.pend.punch = this.pend.kick = 0; }
+    if (edge.special || (this.pend.punch > 0 && this.pend.kick > 0) || (edge.punch && raw.kick) || (edge.kick && raw.punch)) { pr.special = c.special = true; this.pend.punch = this.pend.kick = 0; }
     else for (const b of ["punch", "kick"]) if (this.pend[b] > 0 && --this.pend[b] === 0) pr[b] = c[b] = true;
     if (me && game && game.proj) { const away = me.face > 0 ? "left" : "right"; if (raw[away]) { const o = me.opp;
         const threat = (o.state === "attack" && o.move && Math.abs(o.x - me.x) < (o.move.special ? 7 : 2.6)) || game.proj.some((p) => p.owner !== me.slot && Math.abs(p.x - me.x) < 4 && Math.sign(p.vx) === Math.sign(me.x - p.x));
@@ -1807,6 +1810,7 @@ class Game {
     att.meter = Math.min(100, att.meter + dmg * 0.9); def.meter = Math.min(100, def.meter + dmg * 0.55);
     this.parts.hit(at, att.info.hex, mv.big || (dmg >= 10 ? 1.4 : 1)); this.hitstop = mv.hitstop ?? (dmg >= 10 ? 8 : 5); this.view.shake = Math.max(this.view.shake, dmg >= 10 ? 0.22 : 0.1);
     this.sfx(mv.sfx || "hit"); def.flash = 0.08; def.lowHit = mv.level === "low";
+    if (typeof PAD !== "undefined") PAD.rumble(def.slot === 0 ? (dmg >= 10 ? 0.9 : 0.5) : (dmg >= 10 ? 0.35 : 0.15), dmg >= 10 ? 200 : 90);
     if (this.phase !== "fight") return "hit";
     if (mv.launch || !def.grounded) { def.tripped = false; def.set("air"); def.vx = dir * (mv.launch ? mv.launch[0] : 2.5); def.vy = mv.launch ? mv.launch[1] : 6.5; def.y = Math.max(def.y, 0.01); }
     else if (mv.trip) { def.tripped = true; def.set("trip"); def.vy = 4.5; def.y = 0.01; def.vx = dir * 1.2; }
@@ -1966,6 +1970,86 @@ class AICtrl {
   }
 }
 class DummyCtrl { constructor() { this.cur = {}; this.pressed = {}; this.mode = "stand"; } read() { this.cur = this.mode === "block" ? { block: true } : this.mode === "crouch" ? { down: true, block: true } : {}; this.pressed = {}; return this.cur; } }
+
+/* ================= Game controllers (Xbox, PlayStation, Switch Pro, any "standard" pad) =================
+   Browsers hide controllers until a button is pressed, then report them through the Gamepad API.
+   We poll every frame. Nothing needs switching on: the keyboard and the controller work side by side,
+   and the on-screen button hints follow whichever one was used last.
+
+   Fight:  stick / d-pad move \u00b7 A punch \u00b7 B kick \u00b7 X special (= punch+kick) \u00b7 Y, RB or RT Megaform
+           LB or LT also does a special \u00b7 Start (Menu) pauses
+   Menus:  stick / d-pad choose \u00b7 A select \u00b7 B back \u00b7 Start select */
+const PAD = (() => {
+  // Edge on Xbox: ask for raw controller input instead of the browsing cursor (ignored elsewhere)
+  try { navigator.gamepadInputEmulation = "gamepad"; } catch (_) {}
+  const B = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, VIEW: 8, START: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+  const DIRS = { up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight" };
+  const HOLD = { punch: "PadPunch", kick: "PadKick", special: "PadSpecial", ult: "PadUlt" };
+  let prev = {}, dirPrev = {}, repeatAt = {}, active = false, index = -1;
+  const S = { connected: false, active: false, name: "" };
+
+  const btn = (gp, i) => { const b = gp.buttons[i]; return !!b && (b.pressed || b.value > 0.5); };
+  const send = (code) => { // a full key press, for menus, the intro movie and pausing
+    const key = { Enter: "Enter", Escape: "Escape", ArrowUp: "ArrowUp", ArrowDown: "ArrowDown", ArrowLeft: "ArrowLeft", ArrowRight: "ArrowRight" }[code] || code;
+    dispatchEvent(new KeyboardEvent("keydown", { code, key, bubbles: true, cancelable: true }));
+    dispatchEvent(new KeyboardEvent("keyup", { code, key, bubbles: true, cancelable: true }));
+  };
+  function setUsing(on) {
+    if (active === on) return; active = S.active = on;
+    document.body.classList.toggle("pad", on);
+    if (typeof refreshHints === "function") refreshHints();
+  }
+  addEventListener("gamepadconnected", (e) => { S.connected = true; S.name = e.gamepad.id; if (typeof HUD !== "undefined" && HUD.toast) try { HUD.toast(0, "CONTROLLER CONNECTED"); } catch (_) {} });
+  addEventListener("gamepaddisconnected", () => { S.connected = !!pick(); for (const k of Object.values(DIRS).concat(Object.values(HOLD))) KEYS.delete(k); });
+  // keyboard or mouse use hands the hints back to the keyboard
+  addEventListener("keydown", (e) => { if (e.isTrusted) setUsing(false); }, true);
+  addEventListener("pointerdown", (e) => { if (e.isTrusted && e.pointerType === "mouse") setUsing(false); }, true);
+
+  function pick() {
+    const list = navigator.getGamepads ? navigator.getGamepads() : [];
+    if (index >= 0 && list[index] && list[index].connected) return list[index];
+    for (const gp of list) if (gp && gp.connected && gp.buttons.some((b) => b.pressed)) { index = gp.index; return gp; }
+    for (const gp of list) if (gp && gp.connected) return gp;
+    return null;
+  }
+  function poll() {
+    const gp = pick(); if (!gp) return;
+    const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0, dz = 0.45;
+    const dir = { up: btn(gp, B.UP) || ay < -dz, down: btn(gp, B.DOWN) || ay > dz, left: btn(gp, B.LEFT) || ax < -dz, right: btn(gp, B.RIGHT) || ax > dz };
+    const now = {}; for (const k in B) now[k] = btn(gp, B[k]);
+    const anyNow = Object.values(now).some(Boolean) || Object.values(dir).some(Boolean);
+    if (anyNow) setUsing(true);
+    if (!active) { prev = now; dirPrev = dir; return; }
+    const edge = (k) => now[k] && !prev[k];
+    const mode = typeof APP !== "undefined" ? APP.mode : "movie";
+    const fighting = mode === "fight";
+
+    // held directions drive the fighter
+    for (const k in DIRS) { if (dir[k]) KEYS.add(DIRS[k]); else if (dirPrev[k]) KEYS.delete(DIRS[k]); }
+    // held buttons for the fighter (read by PlayerCtrl)
+    const hold = { punch: now.A, kick: now.B, special: now.X || now.LB || now.LT, ult: now.Y || now.RB || now.RT };
+    for (const k in HOLD) { if (hold[k] && fighting) KEYS.add(HOLD[k]); else KEYS.delete(HOLD[k]); }
+
+    if (fighting) { if (edge("START") || edge("VIEW")) send("Escape"); }
+    else {
+      // menus: one press per tap, auto-repeat when a direction is held
+      const t = performance.now();
+      for (const k in DIRS) {
+        if (dir[k] && !dirPrev[k]) { send(DIRS[k]); repeatAt[k] = t + 380; }
+        else if (dir[k] && t >= repeatAt[k]) { send(DIRS[k]); repeatAt[k] = t + 140; }
+      }
+      if (edge("A") || edge("START")) send("Enter");
+      else if (edge("B") || edge("VIEW")) send("Escape");
+      else if (mode === "intro" || mode === "movie") { if (edge("X") || edge("Y")) send("Enter"); }
+    }
+    prev = now; dirPrev = dir;
+  }
+  (function loop() { try { poll(); } catch (_) {} requestAnimationFrame(loop); })();
+  // a short buzz when you land or take a hit (pads that support it)
+  S.rumble = (strong, ms = 120) => { if (!active || strong <= 0) return; const gp = pick(); const v = gp && gp.vibrationActuator; if (!v || !v.playEffect) return;
+    try { v.playEffect("dual-rumble", { duration: ms, strongMagnitude: Math.min(1, strong), weakMagnitude: Math.min(1, strong * 0.7) }).catch(() => {}); } catch (_) {} };
+  return S;
+})();
 
 /* ================= Special moves and ultimate activations ================= */
 const KITS = {};
@@ -2511,7 +2595,15 @@ const HUD = {
 
 /* ---------- side column ---------- */
 const KEYLBL = [{ left: "A", right: "D", up: "W", down: "S", punch: "F", kick: "G", special: "H", block: "R", ult: "T" }, { left: "\u2190", right: "\u2192", up: "\u2191", down: "\u2193", punch: "K", kick: "L", special: ";", block: "O", ult: "P" }];
+// button labels for whichever device was used last (keyboard, touch pad or game controller)
+const GPK = (b) => `<kbd class="gp ${b.toLowerCase()}">${b}</kbd>`;
+function refreshHints() {
+  if (sideCards.last) sideCards(sideCards.last);
+  if (typeof APP !== "undefined" && APP.mode === "select") APP.selHintText && APP.selHintText();
+  if (!$id("movesOv").hidden) $id("movesIn").innerHTML = $id("cards").innerHTML;
+}
 function sideCards(entries) {
+  sideCards.last = entries;
   $id("cards").innerHTML = entries.map(({ id, slot, cpu }) => {
     const info = BYID[id], m = MOVES[id]; const dk = { "": "", fwd: "<kbd>\u2192</kbd>", down: "<kbd>\u2193</kbd>", back: "<kbd>\u2190</kbd>" };
     return `<div class="pcard" style="--c:${info.hex}"><h3>${info.name}</h3><div class="who">${cpu ? (info.boss ? "FINAL BOSS" : "OPPONENT") : "YOU"} \u00b7 ${info.style.toUpperCase()}</div>
@@ -2523,6 +2615,7 @@ function sideCards(entries) {
       ${m.specials.map((s) => `<span class="k">${cpu ? "" : dk[s.dir] + "<kbd>Z</kbd>+<kbd>X</kbd>"}</span><span class="sp" data-mv="${slot}:${s.name}">${s.name}</span><span class="sub">${s.desc}</span>`).join("")}
       <span class="k">${cpu ? "" : "<kbd>SPACE</kbd>"}</span><span class="sp ult" data-mv="${slot}:${m.ult.name}">${m.ult.name}</span><span class="sub">${cpu ? "Megaform ultimate." : "Megaform. Fill the meter, then press SPACE up close."}</span>
     </div></div>`; }).join("");
+  if (typeof PAD !== "undefined" && PAD.active) { const c = $id("cards"); c.innerHTML = c.innerHTML.replaceAll("<kbd>Z</kbd>+<kbd>X</kbd>", GPK("X")).replaceAll("<kbd>Z</kbd>", GPK("A")).replaceAll("<kbd>X</kbd>", GPK("B")).replaceAll("<kbd>SPACE</kbd>", GPK("Y")).replaceAll("press SPACE", "press Y").replaceAll("<kbd>\u2190</kbd><kbd>\u2192</kbd>", "<kbd>STICK</kbd>"); return; }
   if (TOUCH) { const c = $id("cards"); c.innerHTML = c.innerHTML.replaceAll("<kbd>Z</kbd>+<kbd>X</kbd>", "<kbd>SP</kbd>").replaceAll("<kbd>Z</kbd>", "<kbd>A</kbd>").replaceAll("<kbd>X</kbd>", "<kbd>B</kbd>").replaceAll("<kbd>SPACE</kbd>", "<kbd>MEGA</kbd>").replaceAll("press SPACE", "press MEGA"); }
 }
 
@@ -2579,7 +2672,7 @@ const APP = {
     const a = ROSTER[this.cursor[0]]; SHOW.picks = [a.id, null];
     const el = $id("selN0"); el.style.setProperty("--c", a.hex); el.innerHTML = `${a.name.toUpperCase()}<small>${a.color.toUpperCase()} \u00b7 ${a.style.toUpperCase()}${this.locked[0] ? " \u00b7 READY" : ""}</small>`;
     const er = $id("selN1"); er.style.setProperty("--c", a.hex); er.innerHTML = `<small>MEGAFORM</small>${MOVES[a.id].ult.name.toUpperCase()}`;
-    $id("selHint").textContent = TOUCH ? "TAP A RANGER TO VIEW \u00b7 TAP AGAIN TO LOCK IN" : "CLICK OR ARROWS TO VIEW \u00b7 CLICK AGAIN, ENTER OR Z TO LOCK IN \u00b7 ESC: BACK";
+    this.selHintText();
     sideCards([{ id: a.id, slot: 0 }]);
   },
   lockPick(p) {
@@ -2623,6 +2716,7 @@ const APP = {
   },
   resGo(r) { AUDIO.sfx("confirm"); if (r === "next") { this.tower.i++; this.picks[1] = this.tower.list[this.tower.i]; return this.startFight(towerStage(this.tower.i, this.picks[1])); } if (r === "again") return this.startFight(this.lastStage); if (r === "select") return this.toSelect(); this.toTitle(); },
   /* ---------- keyboard navigation for menus ---------- */
+  selHintText() { $id("selHint").textContent = typeof PAD !== "undefined" && PAD.active ? "STICK OR D-PAD TO VIEW \u00b7 A TO LOCK IN \u00b7 B: BACK" : TOUCH ? "TAP A RANGER TO VIEW \u00b7 TAP AGAIN TO LOCK IN" : "CLICK OR ARROWS TO VIEW \u00b7 CLICK AGAIN, ENTER OR Z TO LOCK IN \u00b7 ESC: BACK"; },
   key(e) {
     const c = e.code; const up = c === "ArrowUp", dn = c === "ArrowDown", lf = c === "ArrowLeft", rt = c === "ArrowRight";
     const ok = c === "Enter" || c === "KeyZ" || c === "Space", back = c === "Escape" || c === "Backspace";

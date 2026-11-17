@@ -205,6 +205,9 @@ body.cine #introCap{bottom:11%} body.cine #introName{bottom:12%}
 #movesBack{font-family:var(--bn);font-size:24px;letter-spacing:.08em;padding:10px;border:0;background:linear-gradient(90deg,#c8a012,#ff7a18);color:#fff}
 [data-p="moves"]{display:none}
 /* ---------- touch layout: screen on top, GBA-style pad underneath ---------- */
+.gpad{display:none} body.pad .kb{display:none} body.pad .gpad{display:block}
+kbd.gp,.gpb{display:inline-grid;place-items:center;min-width:1.5em;height:1.5em;padding:0;border-radius:50%;font-weight:900;color:#0b0b14;border:0}
+kbd.gp.a,.gpb.a{background:#5fd35a} kbd.gp.b,.gpb.b{background:#ff5a5a} kbd.gp.x,.gpb.x{background:#3fa4ff} kbd.gp.y,.gpb.y{background:#ffd21f}
 body.touch{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 body.touch #side{display:none} body.touch .kb{display:none} body.touch [data-p="moves"]{display:flex}
 body.touch #wrap{display:flex;flex-direction:column;height:100dvh;padding:env(safe-area-inset-top,0) env(safe-area-inset-right,0) env(safe-area-inset-bottom,0) env(safe-area-inset-left,0)}

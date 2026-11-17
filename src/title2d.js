@@ -26,8 +26,8 @@ const SHOW = {
     g.save(); g.fillStyle = "rgba(4,6,18,.5)"; g.fillRect(0, 0, VIEW_W, VIEW_H); g.restore();
     const info = BYID[id], x = -3.05;
     const cx = VIEW.sx(x), cy = VIEW.sy(1.0), gr = g.createRadialGradient(cx, cy, 10, cx, cy, 2.2 * VIEW.S); gr.addColorStop(0, rgba(info.hex, 0.45)); gr.addColorStop(1, rgba(info.hex, 0)); g.fillStyle = gr; g.fillRect(cx - 300, cy - 300, 600, 600);
-    // showcase: idle, then a quick punch, kick and blaster pose
-    const k = t % 4.6, seq = [[2.2, 0], [2.32, 4], [2.44, 5], [2.56, 6], [2.68, 7], [2.82, 8], [3.1, 9], [3.24, 10], [3.42, 12], [3.56, 13], [3.9, 14], [4.0, 13]];
+    // showcase: idle, then a quick punch, a kick, a hop and a power stance
+    const k = t % 4.6, seq = [[2.2, 0], [2.32, 4], [2.44, 5], [2.62, 6], [2.74, 7], [2.88, 8], [3.16, 9], [3.3, 10], [3.5, 11], [4.0, 8], [4.1, 0]];
     let fr = 0; for (const [end, f] of seq) if (k < end) { fr = k < 2.2 ? 0 : f; break; }
     g.save(); g.fillStyle = "rgba(0,0,0,.5)"; g.beginPath(); g.ellipse(cx, FLOOR_Y + 3, 0.6 * VIEW.S, 0.09 * VIEW.S, 0, 0, TAU); g.fill(); g.restore();
     drawFrame(g, id, fr, x, 0, 1, { scale: 1.05, squash: fr ? 1 : 1 + Math.sin(t * 3) * 0.008, flash: this.flashT > 0 ? this.flashT : 0 });

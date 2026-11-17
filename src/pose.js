@@ -7,14 +7,68 @@ const AN = (clip, f = 0, o = {}) => Object.assign({ clip, f }, o);
 // [wind-up start, peak, end] of each move clip, in the move clock the engine sends
 const CLIP_PEAK = { jab: [4, 12, 26], cross: [4, 16, 36], punch1: [4, 12, 28], hook: [0, 10, 30], upper: [0, 9, 34], kick: [5, 19, 44], kick2: [8, 19, 35], sweep: [4, 22, 50], jkick: [8, 17, 17], magic1: [8, 28, 50], magic2: [14, 32, 60], throw: [8, 21, 45], fireball: [12, 29, 51] };
 const PUNCHES = ["jab", "cross", "punch1", "hook", "upper", "throw"], KICKS = ["kick", "kick2", "sweep", "jkick"], BLASTS = ["magic1", "magic2", "fireball"];
+/* ---- special-move looks ----
+   Specials ask for a "look" on top of their timing clip, so every special reads differently even though
+   each Ranger sheet only has 16 poses: an energy palm, a pitcher's throw, a held beam, a crouch-and-rise
+   power-up, a ground slam, a spinning warp, a pointing lock-on. Timing comes from the clip (or from the
+   move's own release frame `at` for self-moves); the look only picks frames, motion and glow. */
+function lookPhase(a) {
+  if (a.at) { const f = a.f; return f < a.at ? { wind: true, u: clamp(f / a.at) } : { wind: false, u: clamp((f - a.at) / Math.max(1, (a.end || a.at + 16) - a.at)) }; }
+  return phaseOf(a.clip, a.f);
+}
+const LOOKS = {
+  // energy gathers at the chambered fist, then a full-arm thrust releases it
+  palm(me, a, T) { const p = lookPhase(a);
+    if (p.wind) return p.u < 0.45 ? { frame: 4, orb: [0.42, 1.3, 0.06 + 0.1 * p.u, p.u] } : { frame: 5, orb: [0.6, 1.33, 0.1 + 0.08 * p.u, 0.7 + 0.3 * p.u], push: -0.04 };
+    return p.u < 0.55 ? { frame: 6, push: 0.12 * (1 - p.u), orb: [0.86, 1.36, 0.2 * (1 - p.u * 1.6), 1 - p.u * 1.6] } : { frame: 7 }; },
+  // a pitcher's wind-up: knee up and arm cocked, then the throwing arm snaps through
+  toss(me, a, T) { const p = lookPhase(a);
+    if (p.wind) return p.u < 0.6 ? { frame: 8, rot: 0.1 * p.u, pivot: 0.3, orb: [-0.15, 1.55, 0.09, 0.8] } : { frame: 5, rot: -0.06, pivot: 0.3 };
+    return p.u < 0.45 ? { frame: 6, rot: -0.12 * (1 - p.u), pivot: 0.2, push: 0.1 } : { frame: 7 }; },
+  // a held, trembling thrust for beams and bursts
+  beam(me, a, T) { const p = lookPhase(a);
+    if (p.wind) return p.u < 0.5 ? { frame: 4, aura: p.u, orb: [0.42, 1.3, 0.08 + 0.1 * p.u, p.u] } : { frame: 5, aura: p.u, orb: [0.6, 1.33, 0.16, 1], push: -0.05 * p.u };
+    if (p.u < 0.7) return { frame: 6, aura: 0.8, push: -0.03 + Math.sin(T * 70) * 0.012, orb: [0.86, 1.36, 0.17 + Math.sin(T * 40) * 0.03, 1] };
+    return { frame: 7 }; },
+  // long charge (Electron Transport Chain): a knee-up stance gathering a big orb overhead, then a thrust
+  charge(me, a, T) { const p = lookPhase(a);
+    if (p.wind) return { frame: 8, aura: p.u, drop: -0.08 * p.u, orb: [0.1, 2.15, 0.08 + 0.2 * p.u, 0.6 + 0.4 * p.u] };
+    return p.u < 0.55 ? { frame: 6, push: 0.14 * (1 - p.u), orb: [0.86, 1.36, 0.2 * (1 - p.u * 1.6), 1] } : { frame: 7 }; },
+  // three quick alternating jabs (Na+/K+ Pump)
+  rapid(me, a, T) { const p = lookPhase(a);
+    if (p.wind) return { frame: 4, orb: [0.42, 1.3, 0.08, p.u] };
+    return { frame: p.u < 0.75 ? [6, 5, 6, 5, 6][Math.min(4, Math.floor(p.u * 6.6))] : 7, orb: p.u < 0.6 ? [0.8, 1.36, 0.1, 0.8] : null }; },
+  // crouch and gather, then rise into a floating crane stance with a flare of aura
+  power(me, a, T) { const p = lookPhase(a);
+    if (p.wind) return { frame: 11, aura: 0.3 + 0.7 * p.u, squash: 1 - 0.04 * Math.sin(T * 30), column: p.u };
+    const lift = Math.sin(Math.min(1, p.u * 1.4) * Math.PI) * 0.28;
+    return p.u < 0.85 ? { frame: 8, drop: -lift, aura: 1 - p.u * 0.8, column: 1 - p.u, scale: 1 + 0.03 * (1 - p.u) } : { frame: 0 }; },
+  // hop up, tuck, and slam the ground
+  slam(me, a, T) { const p = lookPhase(a);
+    if (p.wind) { const h = Math.sin(clamp(p.u / 0.85) * Math.PI) * 0.75; return { frame: 11, drop: -h, rot: p.u > 0.55 ? -0.25 : 0, pivot: 0.6, aura: p.u * 0.6 }; }
+    return p.u < 0.35 ? { frame: 11, squash: 0.86 + p.u * 0.3, aura: 0.6 * (1 - p.u) } : p.u < 0.7 ? { frame: 10 } : { frame: 0 }; },
+  // spin into a blur and vanish; spin back in at the new spot
+  warp(me, a, T) { const p = lookPhase(a);
+    if (p.wind) return { frame: 11, rot: p.u * TAU * 1.5, pivot: 0.7, drop: -0.45 * Math.sin(p.u * Math.PI * 0.5), alpha: 1 - p.u * 0.75, scale: 1 - p.u * 0.25, ghosts: true };
+    return p.u < 0.5 ? { frame: 11, rot: -(1 - p.u * 2) * TAU, pivot: 0.7, drop: -0.45 * (1 - p.u * 2), alpha: 0.4 + p.u * 1.2, scale: 0.85 + p.u * 0.3 } : { frame: 4 }; },
+  // point the arm at the target: a reticle forms at the fingertip
+  aim(me, a, T) { const p = lookPhase(a);
+    if (p.wind) return { frame: p.u < 0.5 ? 4 : 5, reticle: p.u };
+    return p.u < 0.75 ? { frame: 6, reticle: 1, push: Math.sin(T * 50) * 0.006 } : { frame: 7 }; },
+  // cell division: a braced knee-up stance while the copy separates
+  split(me, a, T) { return { frame: 8, aura: 0.7, drop: -0.04 * Math.sin(T * 9) }; },
+};
 function phaseOf(clip, f) { const [a, pk, e] = CLIP_PEAK[clip] || [0, 10, 30]; if (f < pk) return { wind: true, u: clamp((f - a) / Math.max(1, pk - a)) }; return { wind: false, u: clamp((f - pk) / Math.max(1, e - pk)) }; }
-function handWorld(me) { return V3(me.x + me.face * 0.5, me.y + 1.3, 0.2); }
+// where the lead fist is in each sprite frame (metres from the feet, measured from the art)
+const HAND = { 6: [0.8, 1.36], 9: [0.78, 1.25], 5: [0.6, 1.33], 8: [0.25, 1.25], 11: [0.35, 0.9] };
+function handWorld(me) { const fr = me.anim && me.id !== "phage" ? poseFor(me).frame : 0, h = HAND[fr] || [0.5, 1.3]; return V3(me.x + me.face * h[0], me.y + h[1], 0.2); }
 
 /* returns { frame, rot, pivot, drop, extra, scale, aura } for the fighter's current animation */
 function poseFor(me) {
   const a = me.anim || AN("idle"), c = a.clip, f = a.f, X = SPR.extra[me.id], T = me.game ? me.game.time : 0;
   const x = (k, fallback) => (X ? { frame: XF[k], extra: true } : fallback);
   if (me.id === "phage") return phagePose(me, c, f);
+  if (a.look && LOOKS[a.look]) return LOOKS[a.look](me, a, T);
   if (me.buff && me.buff.knot > 0) return { frame: 11, rot: Math.sin(T * 9) * 0.5, pivot: 0.6, scale: 0.6, drop: -0.35 };
   if (PUNCHES.includes(c)) {
     const p = phaseOf(c, f);
@@ -29,9 +83,9 @@ function poseFor(me) {
     if (c === "jkick") return X ? { frame: XF.jkick, extra: true } : { frame: p.wind && p.u < 0.6 ? 8 : 9, rot: 0.42, pivot: 0.95 };
     return { frame: p.wind ? (p.u < 0.75 ? 8 : 9) : p.u < 0.5 ? 9 : 10 };
   }
-  if (BLASTS.includes(c)) { const p = phaseOf(c, f); return p.wind ? { frame: p.u < 0.5 ? 12 : 13, aura: p.u } : { frame: p.u < 0.3 ? 14 : 13 }; }
+  if (BLASTS.includes(c)) return LOOKS.palm(me, a, T);
   if (c === "punchCombo") return { frame: [5, 6, 9, 6, 4, 9][Math.floor(f / 6) % 6] };
-  if (c === "cast") return x("cast", { frame: 13, aura: clamp(f / 30), rot: -0.05 });
+  if (c === "cast") return x("cast", { frame: 8, aura: clamp(f / 30), column: clamp(f / 30) });
   if (c === "block" || c === "blockHit") return Object.assign(x("block", { frame: 0 }), { shield: c === "blockHit" ? 2 : 1, push: c === "blockHit" ? -0.06 : 0 });
   if (c === "walkF" || c === "walkB") { const i = ((Math.floor((c === "walkB" ? -f : f) / 5) % 4) + 4) % 4; return { frame: [1, 2, 3, 2][i] }; }
   if (c === "crouch") return a.upper ? Object.assign(x("cblock", { frame: 11, drop: 0.02 }), { shield: 1, low: true }) : x("crouch", { frame: 11, drop: 0.02 });
@@ -42,9 +96,11 @@ function poseFor(me) {
   if (c === "getupSlow") return x("getup", { frame: 11, alpha: 0.85 + 0.15 * Math.sin(T * 30) });
   if (c === "dizzy") return x("dizzy", { frame: 15, rot: Math.sin(T * 4) * 0.08, pivot: 0.1, stars: true });
   if (c === "ko") return x("ko", { frame: 15, rot: -Math.min(Math.PI / 2, 0.4 + f / 25), pivot: 0.32, drop: -0.1 * Math.min(1, f / 30) });
-  if (c === "win") return x(f > 25 ? "win2" : "win", { frame: f < 18 ? 12 : 13, aura: 0.6 });
-  if (c === "intro" || c === "intro2") return { frame: f < 14 ? 12 : f < 34 ? 13 : 0, aura: f < 34 ? 0.5 : 0 };
-  if (c === "charge") return x("charge", { frame: 13, aura: 1 });
+  // victory: a tuck jump, then a floating crane stance in a burst of colour
+  if (c === "win") { if (X) return x(f > 25 ? "win2" : "win", {}); if (f < 16) return { frame: 11, drop: -Math.sin(f / 16 * Math.PI) * 0.9, rot: f / 16 * TAU, pivot: 0.7 }; return { frame: 8, aura: 0.8, column: 0.6, drop: -0.05 - Math.sin(T * 4) * 0.03 }; }
+  // entrance: land from a jump, rise into a guard
+  if (c === "intro" || c === "intro2") return f < 10 ? { frame: 11, drop: -(1 - f / 10) * 1.2 } : f < 16 ? { frame: 11, squash: 0.9 } : f < 36 ? { frame: c === "intro2" ? 8 : 4, aura: 0.6, column: 0.5 } : { frame: 0 };
+  if (c === "charge") return x("charge", { frame: 8, aura: 1, column: 1, drop: -0.12 });
   // idle: a slow breathing bob
   return { frame: 0, squash: 1 + Math.sin(T * 3 + me.slot) * 0.008 };
 }
@@ -66,7 +122,23 @@ function drawFighter(g, me) {
   g.save(); g.globalAlpha = 0.45 * clamp(1 - y * 0.25, 0.3, 1); g.fillStyle = "#000"; g.beginPath(); g.ellipse(VIEW.sx(x), FLOOR_Y + 3, 0.5 * VIEW.S * clamp(1 - y * 0.2, 0.4, 1), 0.08 * VIEW.S, 0, 0, TAU); g.fill(); g.restore();
   if (p.aura) { const r = (0.9 + p.aura * 0.4) * VIEW.S, cx = VIEW.sx(x), cy = VIEW.sy(y + 1.0); g.save(); g.globalCompositeOperation = "lighter"; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r); gr.addColorStop(0, rgba(col, 0.35 * p.aura)); gr.addColorStop(1, rgba(col, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); g.restore(); }
   if (me.buff && me.buff.parry > 0) { const cx = VIEW.sx(x + me.face * 0.45), cy = VIEW.sy(y + 1.0); g.save(); g.globalAlpha = 0.5 + 0.3 * Math.sin(me.game.time * 30); g.strokeStyle = me.id === "smoother" ? "#44e0b0" : "#ff7fbf"; g.lineWidth = 3; g.beginPath(); for (let i = 0; i < 7; i++) { const yy = cy - 0.9 * VIEW.S + i * 0.3 * VIEW.S; g.moveTo(cx, yy); g.arc(cx, yy, 5, 0, TAU); } g.stroke(); g.restore(); }
+  // a rising column of light under power-ups
+  if (p.column > 0.02) { const cx = VIEW.sx(x), w = 0.55 * VIEW.S, top = VIEW.sy(y + 2.6), bot = FLOOR_Y + 2, t = me.game ? me.game.time : 0; g.save(); g.globalCompositeOperation = "lighter";
+    const gr = g.createLinearGradient(0, bot, 0, top); gr.addColorStop(0, rgba(col, 0.2 * p.column)); gr.addColorStop(1, rgba(col, 0)); g.fillStyle = gr; for (const k of [1, 0.66, 0.33]) g.fillRect(cx - w * k, top, w * 2 * k, bot - top);
+    g.strokeStyle = rgba(col, 0.8 * p.column); g.lineWidth = 2; g.beginPath(); g.ellipse(cx, bot, w * (0.8 + 0.2 * Math.sin(t * 9)), 0.1 * VIEW.S, 0, 0, TAU); g.stroke();
+    g.fillStyle = rgba("#ffffff", 0.8 * p.column); for (let i = 0; i < 6; i++) { const k = (t * 1.6 + i / 6) % 1, sx = cx + Math.sin(i * 2.3 + t * 3) * w * 0.7, sy = bot - k * (bot - top); g.globalAlpha = 1 - k; g.fillRect(sx - 1.5, sy - 5, 3, 10); } g.restore(); }
+  // after-images: dashing specials, and the spin of a warp
+  const dash = me.state === "attack" && Math.abs(me.vx) > 6;
+  if (dash || p.ghosts) { const tr = me._trail || (me._trail = []); tr.unshift([x, y, p.frame, p.rot || 0]); tr.length = Math.min(tr.length, 10);
+    for (let i = 3; i < tr.length; i += 3) { const [gx, gy, gf, gr] = tr[i]; drawFrame(g, me.id, gf, gx, gy, me.face, { rot: gr, pivot: p.pivot, drop: p.drop, alpha: 0.4 * (1 - i / 10), silhouette: col }); } }
+  else if (me._trail) me._trail.length = 0;
   drawFrame(g, me.id, p.frame, x + me.face * (p.push || 0), y, me.face, { rot: p.rot, pivot: p.pivot, drop: p.drop, alpha: p.alpha, scale: p.scale, squash: p.squash, extra: p.extra, flash: me.flash });
+  // energy held at the fist (or overhead) while a special charges
+  if (p.orb && p.orb[3] > 0.02 && p.orb[2] > 0.01) { const [ox, oy, orr, oa] = p.orb, cx = VIEW.sx(x + me.face * (ox + (p.push || 0))), cy = VIEW.sy(y + oy) + (p.drop || 0) * VIEW.S, r = orr * VIEW.S, t = me.game ? me.game.time : 0;
+    g.save(); g.globalCompositeOperation = "lighter"; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r * 2.4); gr.addColorStop(0, rgba("#ffffff", 0.95 * oa)); gr.addColorStop(0.25, rgba(col, 0.8 * oa)); gr.addColorStop(1, rgba(col, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r * 2.4, 0, TAU); g.fill();
+    g.strokeStyle = rgba(col, 0.7 * oa); g.lineWidth = 1.5; for (let i = 0; i < 3; i++) { const a0 = t * 8 + i * TAU / 3; g.beginPath(); g.arc(cx, cy, r * 1.5, a0, a0 + 1.2); g.stroke(); } g.restore(); }
+  // a targeting reticle at the fingertip
+  if (p.reticle > 0) { const cx = VIEW.sx(x + me.face * 1.05), cy = VIEW.sy(y + 1.38), r = (0.22 + 0.25 * (1 - p.reticle)) * VIEW.S, t = me.game ? me.game.time : 0; g.save(); g.strokeStyle = rgba(col, 0.9 * p.reticle); g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke(); g.translate(cx, cy); g.rotate(t * 3); for (let i = 0; i < 4; i++) { g.rotate(TAU / 4); g.beginPath(); g.moveTo(r * 0.55, 0); g.lineTo(r * 1.35, 0); g.stroke(); } g.restore(); }
   if (p.shield) { const cx = VIEW.sx(x + me.face * 0.42), cy = VIEW.sy(y + (p.low ? 0.55 : 1.05)), r = (p.low ? 0.55 : 0.85) * VIEW.S; g.save(); g.globalCompositeOperation = "lighter"; g.strokeStyle = rgba("#8ad8ff", p.shield > 1 ? 0.95 : 0.6); g.lineWidth = p.shield > 1 ? 5 : 3; g.beginPath(); g.arc(cx - me.face * r * 0.55, cy, r, -0.9, 0.9, false); if (me.face < 0) { g.beginPath(); g.arc(cx + r * 0.55, cy, r, Math.PI - 0.9, Math.PI + 0.9, false); } g.stroke(); g.restore(); }
   if (me.buff && me.buff.shield > 0) { const cx = VIEW.sx(x), cy = VIEW.sy(y + 1.0), r = 1.05 * VIEW.S, sc = me.id === "mitosis" ? "#ff5fd0" : "#a98cff"; g.save(); g.globalAlpha = 0.22 + 0.06 * Math.sin(me.game.time * 5); g.fillStyle = sc; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.fill(); g.globalAlpha = 0.7; g.strokeStyle = sc; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, r, 0, TAU); g.stroke(); g.beginPath(); g.arc(cx, cy, r * 0.93, 0, TAU); g.stroke(); g.restore(); }
   if (p.stars || me.state === "stun") { const cx = VIEW.sx(x), cy = VIEW.sy(y + 2.05), t = me.game ? me.game.time : 0; g.save(); g.fillStyle = "#ffe66b"; for (let i = 0; i < 3; i++) { const a = t * 5 + i * TAU / 3, sx = cx + Math.cos(a) * 26, sy = cy + Math.sin(a) * 7; g.beginPath(); for (let k = 0; k < 10; k++) { const aa = k * TAU / 10, rr = k % 2 ? 2.5 : 6; g.lineTo(sx + Math.cos(aa) * rr, sy + Math.sin(aa) * rr); } g.fill(); } g.restore(); }

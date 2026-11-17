@@ -14,24 +14,46 @@ import numpy as np
 from PIL import Image
 
 TARGET, CELL_W, CELL_H, BASE = 200, 320, 256, 248
+DEFRINGE = os.environ.get("DEFRINGE", "1") == "1"
 RANGERS = ['atp','ribosome','rougher','golgi','cytoplasm','membrane','mito','nucleus','smoother','lysosome','dna','rna','mitosis','crispr']
+
+def pale0(rgb):
+    return (rgb.min(-1) > 190) & (rgb.max(-1) - rgb.min(-1) < 35)
+
+def _flood(passable, seed):
+    """Everything in `passable` connected (4-way) to `seed`."""
+    from scipy import ndimage
+    lab, _ = ndimage.label(passable)
+    ids = np.unique(lab[seed & passable]); ids = ids[ids > 0]
+    return np.isin(lab, ids)
 
 def clean(rgba, slate=False):
     h, w, _ = rgba.shape; rgb = rgba[..., :3].astype(int); a = rgba[..., 3].astype(int)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    if slate: bgl = (a < 150) | ((r >= 45) & (r < 95) & (g >= 60) & (g < 118) & (b >= 90) & (b < 160) & (b - g > 18) & (g - r > 4))
-    else: bgl = (a < 150) | ((rgb.min(-1) > 195) & (rgb.max(-1) - rgb.min(-1) < 28))
-    bg = np.zeros((h, w), bool); q = deque()
-    for x in range(w):
-        for y in (0, h - 1):
-            if bgl[y, x] and not bg[y, x]: bg[y, x] = True; q.append((y, x))
-    for y in range(h):
-        for x in (0, w - 1):
-            if bgl[y, x] and not bg[y, x]: bg[y, x] = True; q.append((y, x))
-    while q:
-        y, x = q.popleft()
-        for ny, nx in ((y-1, x), (y+1, x), (y, x-1), (y, x+1)):
-            if 0 <= ny < h and 0 <= nx < w and not bg[ny, nx] and bgl[ny, nx]: bg[ny, nx] = True; q.append((ny, nx))
+    border = np.zeros((h, w), bool); border[0] = border[-1] = True; border[:, 0] = border[:, -1] = True
+    if slate: bg = _flood((a < 150) | ((r >= 45) & (r < 95) & (g >= 60) & (g < 118) & (b >= 90) & (b < 160) & (b - g > 18) & (g - r > 4)), border)
+    else:
+        # 1) transparent or near-white background, flooded in from the edges
+        pale = (rgb.min(-1) > 195) & (rgb.max(-1) - rgb.min(-1) < 28)
+        bg = _flood((a < 150) | pale, border)
+        # 2) Some sheets (ribosome, golgi, membrane, lysosome, crispr) were exported with a soft, half-opaque
+        # background matte (alpha ~180-225, tinted by the character); the characters are alpha >= ~235.
+        # On those, soft pixels touching the background are background too. Vivid soft pixels (glows,
+        # muzzle flashes) stay. Sheets with a clean transparent background skip this, so thin details survive.
+        ring = np.concatenate([a[:3].ravel(), a[-3:].ravel(), a[:, :3].ravel(), a[:, -3:].ravel()])
+        if np.median(ring) >= 120:
+            vivid = (rgb.max(-1) - rgb.min(-1) > 100) & (a >= 150)
+            soft = (a < 232) & ~vivid
+            bg = bg | _flood(soft | bg, bg)
+        # 3) background trapped between an arm and the body: a flat, pale patch tinted toward the suit
+        # colour (the matte), unlike the artist's white suit parts, which are shaded and cool
+        from scipy import ndimage
+        lab, n = ndimage.label(~bg & pale0(rgb))
+        for i in range(1, n + 1):
+            s = lab == i
+            if s.sum() < 100: continue
+            px = rgb[s]; mu = px.mean(0)
+            if px.std(0).mean() < 11.5 and mu[0] - mu[2] >= 8: bg |= s
     keep = ~bg & (a >= 150)
     # largest connected shape only
     lab = np.zeros((h, w), np.int32); best, bestn, n = 0, 0, 0
@@ -44,8 +66,35 @@ def clean(rgba, slate=False):
                 if 0 <= ny < h and 0 <= nx < w and keep[ny, nx] and not lab[ny, nx]: lab[ny, nx] = n; q.append((ny, nx))
         if size > bestn: best, bestn = n, size
     m = lab == best; m[:2] = m[-2:] = False; m[:, :2] = m[:, -2:] = False
-    out = rgba.copy(); out[..., 3] = np.where(m, 255, 0)
+    m = defringe(rgba, m) if DEFRINGE else m
+    # transparent pixels get black colour so resampling never bleeds the old white background into the edge
+    out = rgba.copy(); out[..., 3] = np.where(m, 255, 0); out[~m, :3] = 0
     return out
+
+def _nb(m):
+    """4-neighbour shifts of a mask (no wrap-around)."""
+    p = np.pad(m, 1); return p[:-2, 1:-1], p[2:, 1:-1], p[1:-1, :-2], p[1:-1, 2:]
+
+def defringe(rgba, m):
+    """The generated art was cut from a white background, which can leave a pale, half-transparent rim
+    just outside the characters' dark ink outline. Peel that rim back to the ink line (two pixels at
+    most). Only pale or soft pixels right next to ink go, so glows, gun flashes and thin parts stay."""
+    from scipy import ndimage
+    rgb = rgba[..., :3].astype(int); a = rgba[..., 3].astype(int)
+    L = rgb[..., 0] * .3 + rgb[..., 1] * .59 + rgb[..., 2] * .11
+    lo, hi = rgb.min(-1), rgb.max(-1)
+    ink = m & (L < 80)
+    near_ink = ndimage.binary_dilation(ink, iterations=2)
+    rimlike = ((lo > 185) & (hi - lo < 60)) | ((L > 90) & (hi - lo < 40)) | (a < 238)
+    for _ in range(2):
+        up, dn, lf, rt = _nb(m)
+        edge = m & ~(up & dn & lf & rt)
+        peel = edge & ~ink & near_ink & rimlike
+        if not peel.any(): break
+        m = m & ~peel
+    lab, n = ndimage.label(m)
+    if n > 1: sizes = ndimage.sum(m, lab, range(1, n + 1)); m = lab == (1 + int(np.argmax(sizes)))
+    return m
 
 def bbox(c):
     ys, xs = np.nonzero(c[..., 3]); return (xs.min(), ys.min(), xs.max(), ys.max()) if len(xs) else None

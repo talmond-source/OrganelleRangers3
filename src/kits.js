@@ -19,7 +19,7 @@ KITS.atp = {
           tick: (p) => { if (p.t % 2 === 0) me.game.parts.spark(V3(p.x, p.y + (Math.random() - 0.5) * 0.2, 0.25), "#ffd36b", 0.25, V3(-p.vx * 0.1, 0, 0), 0.3); } }); }
       return f >= 30;
     },
-    anim(me, f) { return AN("magic1", strikeF(f, 12, 3, 15, 8, 28, 50), { fade: 0.08 }); } },
+    anim(me, f) { return AN("magic1", strikeF(f, 12, 3, 15, 8, 28, 50), { fade: 0.08, look: "toss" }); } },
   power: { special: true, name: "Power Stroke", dmg: 12, level: "mid", knock: [5.5, 6], special: true, sfx: "heavy", big: 1.4, hs: 20, bs: 14, push: 3,
     update(me, f) {
       if (f === 1) { callout(me, "Power Stroke"); me.game.sfx("charge"); }
@@ -36,7 +36,7 @@ KITS.atp = {
       if (f >= 9 && f < 18) { const h = handWorld(me, "R"); for (let k = 0; k < 2; k++) me.game.parts.bolt(h, V3(me.x + me.face * (0.8 + Math.random() * 0.9), 0.7 + Math.random() * 1.1, 0.2)); if (f % 3 === 0) me.game.sfx("zap"); if (!me.hitDone) me.game.tryHit(me, this); }
       return f >= 38;
     },
-    anim(me, f) { return AN("magic2", strikeF(f, 9, 11, 18, 14, 32, 60), { fade: 0.06 }); } },
+    anim(me, f) { return AN("magic2", strikeF(f, 9, 11, 18, 14, 32, 60), { fade: 0.06, look: "beam" }); } },
   ult: { special: true, ult: true, name: "Megaform", dmg: 2, level: "mid", hs: 20, bs: 16, push: 1, reach: [0, 1.25], ys: [0.6, 1.9], sfx: "heavy",
     onStart(me) { me.meter = 0; me.game.sfx("ultStart"); FX2D.banner("MEGAFORM!", me.info.hex, me.info.name, me.face); },
     onHit(att, def) { att.game.startCine(att, def); },
@@ -98,7 +98,7 @@ KITS.ribosome = {
     onStart(me) { me.meter = 0; me.game.sfx("ultStart"); FX2D.banner("MEGAFORM!", me.info.hex, me.info.name, me.face); },
     onHit(att, def) { att.game.startCine(att, def); },
     update(me, f) { const ext = f < 10 ? 0 : Math.min(4.3, (f - 10) * 0.24); this.reach = [0.2, 0.6 + ext]; me.lassoExt = ext; if (f >= 10 && f < 30 && !me.hitDone) me.game.tryHit(me, this); if (f === 10) me.game.sfx("whoosh"); if (f >= 50 || me.hitDone && f > 32) { me.lassoExt = 0; return true; } return false; },
-    anim(me, f) { return AN("fireball", strikeF(f, 10, 30, 10, 12, 29, 51), { fade: 0.06 }); } },
+    anim(me, f) { return AN("fireball", strikeF(f, 10, 30, 10, 12, 29, 51), { fade: 0.06, look: "beam" }); } },
   // the growing amino-acid whip and the mRNA lasso
   draw(me, g) {
     const mv = me.move, f = me.st; let len = 0;

@@ -5,7 +5,7 @@ fighter with the pixel art from **Cell Rescue**. It is a separate game from Orga
 which stays untouched.
 
 **Play:** open `index.html` (one self-contained file), or the GitHub Pages link once Pages is turned on
-(Settings → Pages → Branch: `main`, folder `/ (root)` → Save). The intro movie streams from `video/`.
+(Settings → Pages → Branch: `main`, folder `/ (root)` → Save).
 
 ## What's in it
 

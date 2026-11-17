@@ -36,7 +36,6 @@
           <button class="mbtn" data-go="arcade"><b>SINGLE PLAYER</b><small>Climb the tower. Stop the Phage.</small></button>
           <button class="mbtn" data-go="training"><b>TRAINING</b><small>Practice with a full Megaform meter</small></button>
           <button class="mbtn" data-go="settings"><b>SETTINGS</b><small>Sound and screen filters</small></button>
-          <button class="mbtn" data-go="intro"><b>WATCH INTRO</b><small>The movie</small></button>
         </div>
         <div class="hintline kb">↑ ↓ TO CHOOSE · ENTER OR Z TO SELECT</div><div class="hintline gpad">STICK OR D-PAD TO CHOOSE · <b class="gpb a">A</b> SELECT · <b class="gpb b">B</b> BACK</div>
       </div>
@@ -107,7 +106,8 @@ var MOVIE = (function () {
   var el = document.getElementById("movie"), v = document.getElementById("movieVid"), tap = document.getElementById("movieTap"), skip = document.getElementById("movieSkip");
   var M = { state: "tap", onEnd: null, t0: 0, failed: false };
   if (touch) { document.getElementById("movieTapTxt").textContent = "TAP TO START"; skip.textContent = "TAP TO SKIP"; }
-  if (Q.has("nomovie")) { M.state = "done"; el.hidden = true; return M; }
+  /* the intro movie was removed from the repo; the game starts straight at the title screen */
+  M.state = "done"; el.hidden = true; M.replay = function (onEnd) { if (onEnd) onEnd(); }; return M;
   v.src = lite ? "video/intro_sd.mp4" : "video/intro.mp4";
   var buffered = new Promise(function (res) { v.addEventListener("canplaythrough", res, { once: true }); v.addEventListener("error", res, { once: true }); });
   var doneRes, done = new Promise(function (r) { doneRes = r; });

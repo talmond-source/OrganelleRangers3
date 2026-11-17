@@ -131,13 +131,13 @@ kbd{font-family:inherit;font-weight:700;font-size:10px;min-width:17px;height:17p
 .menu.side{align-items:flex-start;justify-content:center;padding-left:6cqw;background:linear-gradient(90deg,rgba(5,4,10,.94) 0,rgba(5,4,10,.82) 34%,rgba(5,4,10,0) 62%)}
 #press{background:radial-gradient(80% 70% at 50% 40%,rgba(5,4,10,.35),rgba(5,4,10,.9));cursor:pointer;gap:2.6cqw}
 .logo2{text-align:center;line-height:.82;transform:skewX(-8deg) rotate(-2deg);filter:drop-shadow(0 1.2cqw 2cqw rgba(0,0,0,.8))}
-.logo2 .l0{font-family:var(--px);font-size:.9cqw;letter-spacing:.4em;color:#ffd21f;margin-bottom:1.6cqw;text-shadow:.15cqw .15cqw 0 #000}
+.logo2 .l0{font-family:var(--px);font-size:.9cqw;letter-spacing:.4em;color:#3df2ff;margin-bottom:1.6cqw;text-shadow:.15cqw .15cqw 0 #000}
 .logo2 .l1{font-family:var(--bn);font-size:8.4cqw;letter-spacing:.06em;background:linear-gradient(180deg,#fff 0,#bfe9ff 38%,#3a8fd8 52%,#e9f7ff 60%,#7fb4e8 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:.16cqw #06122a;filter:drop-shadow(.35cqw .35cqw 0 #06122a) drop-shadow(.5cqw .5cqw 0 #1b4fb0)}
 .logo2 .l2{position:relative;font-family:var(--bn);font-size:13.5cqw;letter-spacing:.03em;margin-top:-.6cqw}
-.logo2 .l2 span{position:relative;display:inline-block;background:linear-gradient(180deg,#fff6b0 0,#ffd21f 30%,#ff7a18 52%,#ffe45a 60%,#ff3b1f 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:.2cqw #2a0500;filter:drop-shadow(.45cqw .45cqw 0 #2a0500) drop-shadow(.8cqw .8cqw 0 #a31208) drop-shadow(0 0 3cqw rgba(255,120,20,.55))}
+.logo2 .l2 span{position:relative;display:inline-block;background:linear-gradient(180deg,#f0fdff 0,#7df9ff 30%,#00b3ff 52%,#b8fbff 60%,#0066ff 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:.2cqw #001233;filter:drop-shadow(.45cqw .45cqw 0 #001233) drop-shadow(.8cqw .8cqw 0 #0046b8) drop-shadow(0 0 3cqw rgba(0,200,255,.7))}
 .logo2 .l2::after{content:"";position:absolute;inset:0;background:linear-gradient(105deg,transparent 42%,rgba(255,255,255,.85) 50%,transparent 58%);background-size:260% 100%;mix-blend-mode:overlay;animation:shine 3.2s ease-in-out infinite;pointer-events:none}
 @keyframes shine{0%,35%{background-position:130% 0}80%,100%{background-position:-40% 0}}
-.logo2 .l3{font-family:var(--px);font-size:1.25cqw;letter-spacing:.5em;color:#fff;margin-top:1.4cqw;padding:.7cqw 0;border-top:.2cqw solid #ffd21f;border-bottom:.2cqw solid #ffd21f;text-shadow:.2cqw .2cqw 0 #000}
+.logo2 .l3{font-family:var(--px);font-size:1.25cqw;letter-spacing:.5em;color:#fff;margin-top:1.4cqw;padding:.7cqw 0;border-top:.2cqw solid #3df2ff;border-bottom:.2cqw solid #3df2ff;text-shadow:.2cqw .2cqw 0 #000}
 .logo2 .pips{display:flex;justify-content:center;gap:.55cqw;margin-top:1.3cqw}
 .logo2 .pips i{width:1.9cqw;height:.7cqw;background:var(--c);transform:skewX(-20deg);box-shadow:0 0 .8cqw var(--c)}
 .logo2.in .l1{animation:slamL .5s cubic-bezier(.2,1.4,.4,1) both} .logo2.in .l2{animation:slamR .55s .18s cubic-bezier(.2,1.4,.4,1) both} .logo2.in .l3,.logo2.in .pips,.logo2.in .l0{animation:fadeUp .5s .6s both}
@@ -165,7 +165,7 @@ kbd{font-family:inherit;font-weight:700;font-size:10px;min-width:17px;height:17p
 .lb{position:absolute;left:0;right:0;height:0;background:#000;z-index:5;transition:height .5s;pointer-events:none} .lb.t{top:0} .lb.b{bottom:0} body.cine .lb{height:8%}
 body.cine #introCap{bottom:11%} body.cine #introName{bottom:12%}
 #fade{position:absolute;inset:0;z-index:6;background:#000;opacity:0;pointer-events:none}
-.blinker.big{font-size:2.2cqw;color:#fff;text-shadow:.25cqw .25cqw 0 #000,0 0 1.5cqw #ffd21f}
+.blinker.big{font-size:2.2cqw;color:#3df2ff;text-shadow:.25cqw .25cqw 0 #000,0 0 1.5cqw #00b3ff}
 .tower{display:flex;justify-content:center;gap:.6cqw;margin:.6cqw 0 1cqw} .tower i{width:4.2cqw;height:4.2cqw;background-size:cover;border:.25cqw solid #3a3058;filter:grayscale(1) brightness(.5)} .tower i.beat{filter:none;border-color:var(--c);opacity:.55} .tower i.next{filter:none;border-color:var(--gold);box-shadow:0 0 1.4cqw var(--gold);transform:scale(1.15)} .tower i.boss{border-radius:50%}
 .towernote{font-family:var(--px);font-size:.9cqw!important;letter-spacing:.14em;color:var(--mute)!important;margin-top:1.4cqw!important}
 .blinker{font-family:var(--px);font-size:1.3cqw;color:#fff;letter-spacing:.2em;animation:blink .8s steps(2) infinite}

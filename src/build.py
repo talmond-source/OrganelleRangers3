@@ -18,7 +18,9 @@ head = head.replace('<!--PWA-->', '' if LOCAL else PWA)
 uri = lambda path, mime: 'data:%s;base64,%s' % (mime, base64.b64encode(open(path, 'rb').read()).decode())
 sprites = {}
 for f in sorted(os.listdir('sprites')):
-    if f.endswith('.png'): sprites[f[:-4]] = uri('sprites/' + f, 'image/png')
+    if f.endswith('.png'):  # embedded as lossless WebP: same pixels, about a quarter smaller
+        buf = io.BytesIO(); Image.open('sprites/' + f).convert('RGBA').save(buf, 'WEBP', lossless=True, method=6)
+        sprites[f[:-4]] = 'data:image/webp;base64,' + base64.b64encode(buf.getvalue()).decode()
 meta = json.load(open('sprites/meta.json'))
 stages = {}
 for name in ['environment', 'membranes', 'archive']:

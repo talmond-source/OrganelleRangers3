@@ -20,6 +20,41 @@ RANGERS = ['atp','ribosome','rougher','golgi','cytoplasm','membrane','mito','nuc
 def pale0(rgb):
     return (rgb.min(-1) > 190) & (rgb.max(-1) - rgb.min(-1) < 35)
 
+def clean_white(rgba):
+    """Cutout for ChatGPT sheets drawn on flat white (no transparency). The background is near-white
+    and noisy (JPEG-style), the characters have a dark outline. Removes the outside white, white
+    trapped between limbs, the pale anti-aliased rim outside the outline, and any loose specks."""
+    from scipy import ndimage
+    rgb = rgba[..., :3].astype(int); lo, hi = rgb.min(-1), rgb.max(-1); chroma = hi - lo
+    L = rgb[..., 0] * .3 + rgb[..., 1] * .59 + rgb[..., 2] * .11
+    h, w = lo.shape
+    border = np.zeros((h, w), bool); border[0] = border[-1] = True; border[:, 0] = border[:, -1] = True
+    whiteish = (lo >= 228) & (chroma < 22)
+    bg = _flood(whiteish, border)
+    # white trapped between arms, legs and body: flat near-pure white, like the background itself
+    lab, n = ndimage.label(~bg & (lo >= 244) & (chroma < 12))
+    for k in range(1, n + 1):
+        s_ = lab == k
+        if s_.sum() < 20 or rgb[s_].std(0).mean() >= 4.5: continue
+        # a real gap is ringed by the dark outline; a white suit highlight is ringed by grey shading
+        ring = ndimage.binary_dilation(s_, iterations=3) & ~s_
+        # suit stripes are thin (under 3 px from edge to middle) or ringed by coloured suit, not black outline
+        if (L[ring] < 90).mean() >= 0.45 and (rgb.max(-1) - rgb.min(-1))[ring].mean() < 20 and ndimage.distance_transform_edt(s_).max() >= 3: bg |= s_
+    # pale rim: light, colourless pixels touching the background, peeled back to the outline
+    m = ~bg
+    for _ in range(4):
+        up, dn, lf, rt = _nb(m)
+        edge = m & ~(up & dn & lf & rt)
+        peel = edge & (L > 135) & (chroma < 40)
+        if not peel.any(): break
+        m &= ~peel
+    m = ndimage.binary_opening(m, structure=np.ones((2, 2)))
+    lab, n = ndimage.label(m)
+    if n > 1: sizes = ndimage.sum(m, lab, range(1, n + 1)); m = lab == (1 + int(np.argmax(sizes)))
+    m[:2] = m[-2:] = False; m[:, :2] = m[:, -2:] = False
+    out = rgba.copy(); out[..., 3] = np.where(m, 255, 0); out[~m, :3] = 0
+    return out
+
 def _flood(passable, seed):
     """Everything in `passable` connected (4-way) to `seed`."""
     from scipy import ndimage
@@ -28,6 +63,7 @@ def _flood(passable, seed):
     return np.isin(lab, ids)
 
 def clean(rgba, slate=False, pockets=False):
+    if pockets and (rgba[..., 3] > 250).mean() > 0.99: return clean_white(rgba)
     h, w, _ = rgba.shape; rgb = rgba[..., :3].astype(int); a = rgba[..., 3].astype(int)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
     border = np.zeros((h, w), bool); border[0] = border[-1] = True; border[:, 0] = border[:, -1] = True

@@ -88,11 +88,37 @@ KITS.rougher = kit({ moves: {
   down: mkStrike("Signal Hook", { clip: "throw", at: 13, act: 8, mv: { dmg: 7, reach: [0.3, 4.2], ys: [0.8, 1.7], hs: 26, sfx: "whip", onHit(att, def) { def.x = att.x + att.face * 1.0; def.vx = 0; att.game.parts.spark(V3(def.x, 1.2, 0.2), att.info.hex, 0.6); } } }),
 } });
 /* ---------------- YELLOW · GOLGI ---------------- */
+/* sugar tag: a little shipping label stuck to the opponent; a vesicle that reaches a tagged target is "delivered" for double damage */
+function golgiHuckBoom(me, x, y, direct) {
+  const g = me.game, o = me.opp, tagged = o.buff.tag > 0, P = g.parts, big = tagged ? 1.4 : 1;
+  P.boom(V3(x, y, 0), tagged ? "#ffffff" : "#16b8c3", 0.9 * big); P.ring(V3(x, y, 0.2), "#16b8c3", 0.4, 14 * big); P.ring(V3(x, y, 0.2), "#e4b51d", 0.3, 10 * big);
+  for (let i = 0; i < 10; i++) { const a = Math.random() * TAU, v = 3 + Math.random() * 4; P.spark(V3(x, y, 0.2), i % 2 ? "#16b8c3" : "#e4b51d", 0.25, V3(Math.cos(a) * v, Math.sin(a) * v + 2, 0), 0.5); }
+  g.sfx("boom"); g.view.shake = Math.max(g.view.shake, tagged ? 0.35 : 0.18);
+  if (direct) return;
+  if (o.grounded && Math.abs(o.x - x) < 1.3 && o.hurt()) g.resolve(me, o, huckMv(me), V3(o.x, 0.7, 0.3));
+}
+function huckMv(me) { const tagged = me.opp.buff.tag > 0;
+  return { dmg: tagged ? 18 : 9, big: tagged ? 1.9 : 1.1, level: "mid", hs: 22, bs: 12, push: 2.6, special: true, sfx: "heavy", knock: tagged ? [4, 7] : null,
+    onHit(att, def) { if (def.buff.tag > 0) { def.buff.tag = 0; HUD.pop(def, "DELIVERED!", "#ffffff"); att.game.parts.ring(V3(def.x, 1.2, 0.2), "#ffffff", 0.5, 18); } } }; }
 KITS.golgi = kit({ moves: {
-  "": mkShot("Tag & Ship", { clip: "throw", look: "toss", at: 13, make: () => vesicle("#16b8c3", 0.2), mv: (me) => ({ dmg: me.opp.buff.tag > 0 ? 17 : 8, big: me.opp.buff.tag > 0 ? 1.8 : 1, onHit(att, def) { if (def.buff.tag > 0) { def.buff.tag = 0; HUD.pop(def, "DELIVERED!", "#ffffff"); } else { def.buff.tag = 480; HUD.pop(def, "SUGAR TAGGED", att.info.hex); } } }) }),
+  "": mkShot("Tag & Ship", { look: "toss", at: 13, speed: 12, make: () => orb("#e4b51d", 0.09, 0.8), spin: 14, mv: { dmg: 5, hs: 14, push: 1.4, onHit(att, def) { def.buff.tag = 480; HUD.pop(def, "SUGAR TAGGED", att.info.hex); } } }),
   fwd: mkSelf("Vesicle Transport", { look: "warp", at: 9, end: 22, fn: (me) => teleport(me, behind(me), "#16b8c3") }),
-  down: mkStrike("Cis-to-Trans Dash", { clip: "cross", at: 8, act: 12, lunge: 15, through: true, trail: "#e4b51d", mv: { dmg: 10, reach: [0, 0.9], knock: [2, 6] } }),
-} });
+  // a lobbed vesicle that bursts on contact or on the floor
+  down: mkShot("Vesicle Huck", { look: "toss", at: 14, end: 36, speed: 6, y: 1.7, make: () => vesicle("#16b8c3", 0.3), spin: 4, mv: { dmg: 9 },
+    proj: (me) => { const T = 0.8, d = Math.abs(me.opp.x - me.x) - 0.7;
+      return { vx: me.face * clamp(d / T, 2.5, 10), vy: 4.5, grav: 14, mv: huckMv(me),
+        tick: (p) => { p.mv = huckMv(me); if (p.t % 3 === 0) me.game.parts.spark(V3(p.x, p.y, 0.25), "#9fe8ff", 0.18, V3(-p.vx * 0.1, 0, 0), 0.3); },
+        onGround: (p) => { p.ground = true; golgiHuckBoom(me, p.x, 0.25, false); },
+        onDie: (p) => { if (!p.ground && Math.abs(p.x) < HALF + 1) golgiHuckBoom(me, p.x, p.y, true); } }; } }),
+},
+  // the sugar tag hangs over a tagged opponent until it is delivered or wears off
+  draw(me, g) { const o = me.opp; if (!o || !(o.buff.tag > 0) || ["ko"].includes(o.state)) return;
+    const t = me.game.time, x = VIEW.sx(o.x + 0.1), y = VIEW.sy(o.y + 2.3 + Math.sin(t * 4) * 0.04), w = 0.62 * VIEW.S, h = 0.24 * VIEW.S, fade = o.buff.tag < 90 ? (Math.floor(t * 8) % 2 ? 0.35 : 1) : 1;
+    g.save(); g.globalAlpha = fade; g.translate(x, y); g.rotate(Math.sin(t * 3) * 0.12);
+    g.strokeStyle = "#e4b51d"; g.lineWidth = 2; g.beginPath(); g.moveTo(-w / 2, 0); g.lineTo(-w / 2 - 10, -8); g.stroke();
+    g.fillStyle = "#fff4c8"; g.strokeStyle = "#5a4508"; g.beginPath(); g.moveTo(-w / 2, -h / 2); g.lineTo(w / 2, -h / 2); g.lineTo(w / 2, h / 2); g.lineTo(-w / 2, h / 2); g.lineTo(-w / 2 - h * 0.35, 0); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle = "#16b8c3"; g.beginPath(); for (let i = 0; i < 6; i++) { const a = i * TAU / 6, r = h * 0.3; g.lineTo(-w * 0.28 + Math.cos(a) * r, Math.sin(a) * r); } g.closePath(); g.fill();
+    g.fillStyle = "#5a4508"; g.font = `900 ${h * 0.5}px system-ui`; g.textAlign = "left"; g.textBaseline = "middle"; g.fillText("SHIP", -w * 0.12, 1); g.restore(); } });
 /* ---------------- BLUE · CYTOPLASM ---------------- */
 KITS.cytoplasm = kit({ moves: {
   "": mkSelf("Cytoplasmic Streaming", { look: "slam", at: 10, end: 30, fn: (me, opp, g) => { const d = me.face; g.zone({ x: (me.x + opp.x) / 2, w: 5, life: 110, color: "#2f7fe0", op: 0.35, tick: (gm, z) => { if (opp.grounded && Math.abs(opp.x - z.x) < 5) { opp.x = clamp(opp.x + d * 0.055, -HALF, HALF); if (z.life % 8 === 0) gm.parts.spark(V3(opp.x, 0.1, 0.3), "#7fc0ff", 0.25, V3(d * 3, 0.5, 0), 0.3); } } }); } }),

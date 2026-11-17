@@ -24,7 +24,8 @@ stages = {}
 for name in ['environment', 'membranes', 'archive']:
     im = Image.open('stages/%s.png' % name).convert('RGB'); im.thumbnail((1700, 600), Image.LANCZOS); buf = io.BytesIO(); im.save(buf, 'JPEG', quality=84, optimize=True)
     stages[name] = 'data:image/jpeg;base64,' + base64.b64encode(buf.getvalue()).decode()
-data_js = 'const SPRITE_DATA = %s;\nconst SPRITE_META = %s;\nconst STAGE_DATA = %s;\n' % (json.dumps(sprites), json.dumps(meta), json.dumps(stages))
+megas = {f[:-5]: uri('mega/' + f, 'image/webp') for f in sorted(os.listdir('mega')) if f.endswith('.webp')}
+data_js = 'const SPRITE_DATA = %s;\nconst SPRITE_META = %s;\nconst STAGE_DATA = %s;\nconst MEGA_DATA = %s;\n' % (json.dumps(sprites), json.dumps(meta), json.dumps(stages), json.dumps(megas))
 js = "\n".join(open(f).read() for f in ['data.js', 'diagrams.js', 'molecules.js', 'core2d.js', 'pose.js', 'fx.js', 'audio.js', 'fight.js', 'gamepad.js', 'kits.js', 'kits2.js', 'megas2d.js', 'title2d.js', 'app.js'])
 js += '\nAPP.init();\n'
 def esc(s):

@@ -25,8 +25,22 @@ const MEGA_ART = {
   phage: (g) => { dgPhage(g, 64, 78, 2.1, 0); },
 };
 const _megaCache = {};
+/* the Megaform artwork from Organelle Rangers 2 (images in src/mega); the Phage keeps its drawn T4 */
+const MEGA_IMG = {};
+for (const id in (typeof MEGA_DATA !== "undefined" ? MEGA_DATA : {})) { const im = new Image(); im.onload = () => { delete _megaCache[id]; }; im.src = MEGA_DATA[id]; MEGA_IMG[id] = im; }
+const MEGA_PX = 320;
 function megaArt(id) {
   if (_megaCache[id]) return _megaCache[id];
+  const im = MEGA_IMG[id];
+  if (im && im.complete && im.naturalWidth) {
+    // fit the picture into a square, then add a dark rim so it reads against any background
+    const c = document.createElement("canvas"); c.width = c.height = MEGA_PX; const g = c.getContext("2d"), k = Math.min(MEGA_PX / im.naturalWidth, MEGA_PX / im.naturalHeight), w = im.naturalWidth * k, h = im.naturalHeight * k;
+    g.imageSmoothingQuality = "high"; g.drawImage(im, (MEGA_PX - w) / 2, (MEGA_PX - h) / 2, w, h);
+    const o = document.createElement("canvas"); o.width = o.height = MEGA_PX + 12; const q = o.getContext("2d");
+    for (let a = 0; a < 16; a++) q.drawImage(c, 6 + Math.cos(a / 16 * TAU) * 3, 6 + Math.sin(a / 16 * TAU) * 3);
+    q.globalCompositeOperation = "source-in"; q.fillStyle = "#07060c"; q.fillRect(0, 0, o.width, o.height); q.globalCompositeOperation = "source-over"; q.drawImage(c, 6, 6);
+    o.photo = true; return (_megaCache[id] = o);
+  }
   const c = document.createElement("canvas"); c.width = c.height = MEGA_RES; const g = c.getContext("2d"); (MEGA_ART[id] || MEGA_ART.nucleus)(g);
   // hard dark outline so the shape reads against any background
   const o = document.createElement("canvas"); o.width = o.height = MEGA_RES + 8; const q = o.getContext("2d");
@@ -75,7 +89,7 @@ function megaCine(game, att, def) {
       const t = this.t, m = this.megaPos(), S = VIEW.S, dark = ss(t, 0, 0.4) * (1 - ss(t, HIT + 0.5, DUR));
       // darken the arena, then redraw both fighters on top so they stay readable
       g.save(); g.fillStyle = `rgba(4,3,12,${0.62 * dark})`; g.fillRect(-40, -40, VIEW_W + 80, VIEW_H + 80);
-      const cx = VIEW.sx(m.x), cy = VIEW.sy(m.y), size = 2.9 * S * m.s;
+      const size = 2.9 * S * m.s, cx = clamp(VIEW.sx(m.x), size * 0.5 + 6, VIEW_W - size * 0.5 - 6), cy = VIEW.sy(m.y);
       // speed lines radiating from the Megaform
       g.globalCompositeOperation = "lighter"; g.globalAlpha = 0.35 * dark; g.strokeStyle = st.col; g.lineWidth = 2;
       for (let i = 0; i < 26; i++) { const a = i / 26 * TAU + t * 0.6, r0 = size * 0.62, r1 = size * (1.4 + (i % 3) * 0.3); g.beginPath(); g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0); g.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1); g.stroke(); }
@@ -91,7 +105,7 @@ function megaCine(game, att, def) {
       if (st.kind === "engulf" && t > 2.1 && t < HIT + 0.3) { g.save(); g.globalAlpha = 0.45; g.fillStyle = st.col; g.beginPath(); g.arc(tx, ty, 1.1 * S, 0, TAU); g.fill(); g.restore(); }
       if (st.kind === "drill" && t > 1.6 && t < HIT + 0.1) { g.save(); g.translate(cx, cy); g.rotate(t * 30); g.strokeStyle = "rgba(255,255,255,.6)"; g.lineWidth = 3; for (let i = 0; i < 4; i++) { g.rotate(Math.PI / 2); g.beginPath(); g.arc(0, 0, size * 0.55, 0, 0.8); g.stroke(); } g.restore(); }
       // the Megaform itself, in hard pixels
-      if (m.a > 0.01) { g.save(); g.globalAlpha = m.a; g.imageSmoothingEnabled = false; g.translate(cx, cy); if (st.kind === "drill") g.rotate(Math.sin(t * 40) * 0.06 + att.face * 0.5); if (st.kind === "slam" && t > 1.6 && t < HIT) g.rotate(att.face * 0.15);
+      if (m.a > 0.01) { g.save(); g.globalAlpha = m.a; g.imageSmoothingEnabled = !!art.photo; g.imageSmoothingQuality = "high"; g.translate(cx, cy); if (st.kind === "drill") g.rotate(Math.sin(t * 40) * 0.06 + att.face * 0.5); if (st.kind === "slam" && t > 1.6 && t < HIT) g.rotate(att.face * 0.15);
         const bob = Math.sin(t * 3) * 0.05 * S; g.drawImage(art, -size / 2, -size / 2 + bob, size, size); g.restore(); }
       // title card while it rises
       if (t > 0.6 && t < 2.4) { const a = ss(t, 0.6, 0.9) * (1 - ss(t, 2.1, 2.4)); g.save(); g.globalAlpha = a; g.font = "22px P2, monospace"; g.textAlign = "center"; g.lineWidth = 6; g.strokeStyle = "#07060c"; const label = ultName.toUpperCase(); g.strokeText(label, VIEW_W / 2, 150); g.fillStyle = st.col; g.fillText(label, VIEW_W / 2, 150); g.restore(); }

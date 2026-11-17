@@ -60,7 +60,7 @@ const VIEW = {
 };
 
 /* ---------------- sprites: Cell Rescue art, rebuilt at fighting-game scale ---------------- */
-const SPR = { img: {}, port: {}, ready: false, extra: {} };
+const SPR = { img: {}, port: {}, ready: false, extra: {}, motion: {} };
 const FIGHTER_H = 1.85; // metres, idle height
 function loadImage(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
 async function loadSprites(progress) {
@@ -69,13 +69,14 @@ async function loadSprites(progress) {
     SPR.img[id] = await loadImage(SPRITE_DATA[id]);
     if (SPRITE_DATA[id + "-portrait"]) SPR.port[id] = await loadImage(SPRITE_DATA[id + "-portrait"]);
     if (SPRITE_DATA[id + "-extra"]) SPR.extra[id] = await loadImage(SPRITE_DATA[id + "-extra"]);
+    if (SPRITE_DATA[id + "-motion"]) SPR.motion[id] = await loadImage(SPRITE_DATA[id + "-motion"]);
     progress && progress(++n, ids.length);
   }
   SPR.ready = true;
 }
 /* draw one atlas frame with its feet at world (x, y). opts: rot (radians, + = lean forward), pivot height (m), alpha, scale, flip, tint */
 function drawFrame(g, id, frame, x, y, face, o = {}) {
-  const boss = id === "phage", sheet = o.extra ? SPR.extra[id] : SPR.img[id]; if (!sheet) return;
+  const boss = id === "phage", which = o.motion ? "motion" : o.extra ? "extra" : "img", sheet = SPR[which][id]; if (!sheet) return;
   const cw = boss ? SPRITE_META.phageCell[0] : SPRITE_META.cell[0], ch = boss ? SPRITE_META.phageCell[1] : SPRITE_META.cell[1], base = boss ? SPRITE_META.phageBase : SPRITE_META.base;
   const cols = 4, sx = (frame % cols) * cw, sy = Math.floor(frame / cols) * ch;
   const px = VIEW.S * FIGHTER_H / SPRITE_META.target * (o.scale || 1);
@@ -85,17 +86,17 @@ function drawFrame(g, id, frame, x, y, face, o = {}) {
   g.scale(dir * px, px);
   if (o.squash) g.scale(1, o.squash);
   g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
-  if (o.silhouette) { const c = silhouette(id, frame, o.silhouette, boss); g.drawImage(c, -cw / 2, -base); }
+  if (o.silhouette) { const c = silhouette(id, frame, o.silhouette, boss, which); g.drawImage(c, -cw / 2, -base); }
   else g.drawImage(sheet, sx, sy, cw, ch, -cw / 2, -base, cw, ch);
-  if (o.flash > 0) { g.globalAlpha = Math.min(1, o.flash * 8); g.drawImage(silhouette(id, frame, "#ffffff", boss), -cw / 2, -base); }
+  if (o.flash > 0) { g.globalAlpha = Math.min(1, o.flash * 8); g.drawImage(silhouette(id, frame, "#ffffff", boss, which), -cw / 2, -base); }
   g.restore();
 }
 const _sil = {};
-function silhouette(id, frame, color, boss) {
-  const k = id + ":" + frame + ":" + color; if (_sil[k]) return _sil[k];
+function silhouette(id, frame, color, boss, which = "img") {
+  const k = id + ":" + which + ":" + frame + ":" + color; if (_sil[k]) return _sil[k];
   const cw = boss ? SPRITE_META.phageCell[0] : SPRITE_META.cell[0], ch = boss ? SPRITE_META.phageCell[1] : SPRITE_META.cell[1];
   const c = document.createElement("canvas"); c.width = cw; c.height = ch; const g = c.getContext("2d");
-  g.drawImage(SPR.img[id], (frame % 4) * cw, Math.floor(frame / 4) * ch, cw, ch, 0, 0, cw, ch); g.globalCompositeOperation = "source-atop"; g.fillStyle = color; g.fillRect(0, 0, cw, ch);
+  g.drawImage(SPR[which][id], (frame % 4) * cw, Math.floor(frame / 4) * ch, cw, ch, 0, 0, cw, ch); g.globalCompositeOperation = "source-atop"; g.fillStyle = color; g.fillRect(0, 0, cw, ch);
   return (_sil[k] = c);
 }
 

@@ -27,7 +27,7 @@ def _flood(passable, seed):
     ids = np.unique(lab[seed & passable]); ids = ids[ids > 0]
     return np.isin(lab, ids)
 
-def clean(rgba, slate=False):
+def clean(rgba, slate=False, pockets=False):
     h, w, _ = rgba.shape; rgb = rgba[..., :3].astype(int); a = rgba[..., 3].astype(int)
     r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
     border = np.zeros((h, w), bool); border[0] = border[-1] = True; border[:, 0] = border[:, -1] = True
@@ -45,6 +45,13 @@ def clean(rgba, slate=False):
             vivid = (rgb.max(-1) - rgb.min(-1) > 100) & (a >= 150)
             soft = (a < 232) & ~vivid
             bg = bg | _flood(soft | bg, bg)
+            # background trapped between an arm and the body keeps the matte's softness (alpha < 240),
+            # while the characters are solid; any sizeable soft patch inside is a trapped pocket
+            from scipy import ndimage
+            lab, n = ndimage.label(ndimage.binary_opening(~bg & (a >= 150) & (a < 240) & ~vivid))
+            for i in range(1, n + 1):
+                s = lab == i
+                if s.sum() >= 40: bg |= ndimage.binary_dilation(s) & (a < 246) & ~vivid
         # 3) background trapped between an arm and the body: a flat, pale patch tinted toward the suit
         # colour (the matte), unlike the artist's white suit parts, which are shaded and cool
         from scipy import ndimage
@@ -54,6 +61,15 @@ def clean(rgba, slate=False):
             if s.sum() < 100: continue
             px = rgb[s]; mu = px.mean(0)
             if px.std(0).mean() < 11.5 and mu[0] - mu[2] >= 8: bg |= s
+    if pockets:
+        # new sheets are drawn on flat white: white trapped between arms and body is perfectly flat,
+        # while white suit parts are shaded, so flat pure-white patches inside the body are background
+        from scipy import ndimage
+        flatw = ~bg & (rgb.min(-1) > 236) & (rgb.max(-1) - rgb.min(-1) < 14)
+        lab, n = ndimage.label(flatw)
+        for i in range(1, n + 1):
+            s_ = lab == i
+            if s_.sum() >= 30 and rgb[s_].std(0).mean() < 7: bg |= ndimage.binary_dilation(s_) & (rgb.min(-1) > 200)
     keep = ~bg & (a >= 150)
     # largest connected shape only
     lab = np.zeros((h, w), np.int32); best, bestn, n = 0, 0, 0
@@ -99,9 +115,9 @@ def defringe(rgba, m):
 def bbox(c):
     ys, xs = np.nonzero(c[..., 3]); return (xs.min(), ys.min(), xs.max(), ys.max()) if len(xs) else None
 
-def atlas(path, cols, rows, target, cell_w, cell_h, base, scale=None, ref_cell=None):
+def atlas(path, cols, rows, target, cell_w, cell_h, base, scale=None, ref_cell=None, pockets=False):
     im = np.array(Image.open(path).convert('RGBA')); H, W, _ = im.shape; cw, ch = W // cols, H // rows
-    cells = [clean(im[r*ch:(r+1)*ch, c*cw:(c+1)*cw]) for r in range(rows) for c in range(cols)]
+    cells = [clean(im[r*ch:(r+1)*ch, c*cw:(c+1)*cw], pockets=pockets) for r in range(rows) for c in range(cols)]
     if scale is None: b0 = bbox(cells[0]); scale = target / (b0[3] - b0[1] + 1)
     elif ref_cell: scale = scale * ref_cell / cw  # extra sheets may be a different size: keep the Ranger the same height
     sheet = Image.new('RGBA', (cell_w * cols, cell_h * rows), (0, 0, 0, 0)); info = []
@@ -126,12 +142,14 @@ def main():
     for rid in RANGERS:
         sheet, info, scale = atlas(os.path.join(src, rid + '-sheet.png'), 4, 4, TARGET, CELL_W, CELL_H, BASE)
         sheet.save(os.path.join(dst, rid + '.png'), optimize=True); meta[rid] = info
-        # optional extra poses (EXTRA-POSE-PROMPTS.md): <id>-extra.png, 4x4, scaled to match the main sheet
-        extra = os.path.join(src, rid + '-extra.png')
-        if os.path.exists(extra):
-            main_cell = Image.open(os.path.join(src, rid + '-sheet.png')).size[0] // 4
-            xs, xinfo, _ = atlas(extra, 4, 4, TARGET, CELL_W, CELL_H, BASE, scale=scale, ref_cell=main_cell)
-            xs.save(os.path.join(dst, rid + '-extra.png'), optimize=True); meta[rid + '-extra'] = xinfo
+        # optional new sheets (EXTRA-POSE-PROMPTS.md): <id>-extra.png (fight poses) and <id>-motion.png
+        # (in-between frames). Pose 1 of each is the idle stance, which sets the scale, so the Ranger
+        # comes out the same height whatever size ChatGPT made the picture.
+        for kind in ('extra', 'motion'):
+            path = os.path.join(src, rid + '-' + kind + '.png')
+            if os.path.exists(path):
+                xs, xinfo, _ = atlas(path, 4, 4, TARGET, CELL_W, CELL_H, BASE, pockets=True)
+                xs.save(os.path.join(dst, rid + '-' + kind + '.png'), optimize=True); meta[rid + '-' + kind] = xinfo; print(rid, kind)
         portrait(os.path.join(src, rid + '-approved.png'), os.path.join(dst, rid + '-portrait.png'))
         print(rid, 'ok')
     sheet, info, _ = atlas(os.path.join(src, 'phage-sheet.png'), 4, 2, int(TARGET * 1.3), 400, 320, 312)

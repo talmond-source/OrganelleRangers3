@@ -20,10 +20,11 @@ RANGERS = ['atp','ribosome','rougher','golgi','cytoplasm','membrane','mito','nuc
 def pale0(rgb):
     return (rgb.min(-1) > 190) & (rgb.max(-1) - rgb.min(-1) < 35)
 
-def clean_white(rgba):
+def clean_white(rgba, keep_all=False):
     """Cutout for ChatGPT sheets drawn on flat white (no transparency). The background is near-white
     and noisy (JPEG-style), the characters have a dark outline. Removes the outside white, white
-    trapped between limbs, the pale anti-aliased rim outside the outline, and any loose specks."""
+    trapped between limbs, the pale anti-aliased rim outside the outline, and any loose specks.
+    keep_all keeps every piece bigger than a speck (for props that fly apart), not just the biggest."""
     from scipy import ndimage
     rgb = rgba[..., :3].astype(int); lo, hi = rgb.min(-1), rgb.max(-1); chroma = hi - lo
     L = rgb[..., 0] * .3 + rgb[..., 1] * .59 + rgb[..., 2] * .11
@@ -50,7 +51,9 @@ def clean_white(rgba):
         m &= ~peel
     m = ndimage.binary_opening(m, structure=np.ones((2, 2)))
     lab, n = ndimage.label(m)
-    if n > 1: sizes = ndimage.sum(m, lab, range(1, n + 1)); m = lab == (1 + int(np.argmax(sizes)))
+    if n > 1:
+        sizes = ndimage.sum(m, lab, range(1, n + 1))
+        m = np.isin(lab, 1 + np.nonzero(sizes >= 60)[0]) if keep_all else lab == (1 + int(np.argmax(sizes)))
     m[:2] = m[-2:] = False; m[:, :2] = m[:, -2:] = False
     out = rgba.copy(); out[..., 3] = np.where(m, 255, 0); out[~m, :3] = 0
     return out
@@ -145,7 +148,9 @@ def defringe(rgba, m):
         if not peel.any(): break
         m = m & ~peel
     lab, n = ndimage.label(m)
-    if n > 1: sizes = ndimage.sum(m, lab, range(1, n + 1)); m = lab == (1 + int(np.argmax(sizes)))
+    if n > 1:
+        sizes = ndimage.sum(m, lab, range(1, n + 1))
+        m = np.isin(lab, 1 + np.nonzero(sizes >= 60)[0]) if keep_all else lab == (1 + int(np.argmax(sizes)))
     return m
 
 def bbox(c):

@@ -28,6 +28,14 @@ const AUDIO = {
       case "win": [392, 523, 659, 784, 659, 784, 1046].forEach((f, i) => this.tone(f, 0.22, "square", 0.08, i * 0.12)); break;
       case "ultStart": this.tone(110, 0.6, "sawtooth", 0.15, 0, 880); this.noise(0.5, 0.3, 1200, 0.6); break;
       case "impact": this.noise(0.4, 0.7, 400, 0.4); this.tone(55, 0.5, "square", 0.35, 0, 30); break;
+      case "domain": this.tone(55, 1.6, "sine", 0.4, 0, 48); this.tone(110, 1.3, "triangle", 0.18); this.tone(165, 1.1, "triangle", 0.1, 0.02); this.noise(1.2, 0.35, 300, 0.5, 0, "lowpass"); break;
+      case "whistle": this.tone(2200, 0.85, "sine", 0.1, 0, 500); break;
+      case "creak": this.tone(70, 0.32, "sawtooth", 0.12, 0, 130); this.noise(0.3, 0.12, 500, 6); break;
+      case "shatter": this.noise(0.6, 0.5, 5000, 0.8, 0, "highpass"); [2400, 3100, 1900, 2700].forEach((f, i) => this.tone(f, 0.18, "triangle", 0.06, i * 0.05)); break;
+      case "bonk": this.tone(520, 0.18, "square", 0.16, 0, 160); this.noise(0.12, 0.35, 900, 1); this.tone(1200, 0.08, "triangle", 0.08, 0.02); break;
+      case "pop": this.tone(900, 0.07, "sine", 0.2, 0, 200); this.noise(0.08, 0.3, 2500, 1.5); break;
+      case "boing": this.tone(180, 0.45, "sine", 0.2, 0, 420); this.tone(360, 0.35, "triangle", 0.06, 0.05, 700); break;
+      case "crunch": this.noise(0.22, 0.6, 700, 1.2, 0, "lowpass"); this.tone(95, 0.2, "square", 0.18, 0, 55); this.noise(0.1, 0.3, 3000, 2, 0.03); break;
       case "select": this.tone(660, 0.07, "square", 0.08); break;
       case "confirm": this.tone(523, 0.1, "square", 0.1); this.tone(784, 0.15, "square", 0.1, 0.07); break;
       case "move": this.tone(440, 0.04, "square", 0.05); break;

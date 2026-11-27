@@ -316,10 +316,10 @@ class Game {
   }
   startCine(att, def) {
     this.phase = "cine"; att.meter = 0; this.proj.forEach((p) => (p.dead = true));
-    this.cine = megaCine(this, att, def); this.sfx("ultStart");
+    this.cine = (typeof domainCine === "function" && domainCine(this, att, def)) || megaCine(this, att, def); this.sfx("ultStart");
   }
   endCine() {
-    const { att, def, dmg } = this.cine; const mv = { dmg, level: "unblockable", knock: [6, 10], big: 2, hitstop: 0, sfx: "heavy" };
+    const { att, def, dmg } = this.cine; const mv = Object.assign({ dmg, level: "unblockable", knock: [6, 10], big: 2, hitstop: 0, sfx: "heavy" }, this.cine.mv || {});
     if (this.cine.dispose) this.cine.dispose(); this.cine = null; this.phase = "fight"; att.cineAnim = def.cineAnim = null;
     att.set("idle"); def.set("idle"); def.combo = 0; this.resolve(att, def, mv, V3(def.x, 1.2, 0.3)); def.combo = 0;
     if (this.koPending && this.koPending.hp <= 0) { this.phase = "fight"; this.ko(this.koPending); }

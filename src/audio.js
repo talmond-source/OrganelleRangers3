@@ -41,6 +41,7 @@ const AUDIO = {
       case "fizzle": this.tone(420, 0.45, "square", 0.06, 0, 90); this.noise(0.4, 0.12, 3000, 2, 0.05); break;
       case "disc": this.tone(300, 0.35, "sawtooth", 0.07, 0, 1400); this.tone(600, 0.3, "triangle", 0.05, 0.03, 2200); break;
       case "roar": this.noise(0.5, 0.45, 400, 0.7, 0, "lowpass"); this.tone(110, 0.5, "sawtooth", 0.12, 0, 70); this.tone(165, 0.4, "sawtooth", 0.06, 0.02, 90); break;
+      case "splash": this.noise(0.6, 0.45, 900, 0.5, 0, "lowpass"); this.tone(200, 0.4, "sine", 0.08, 0, 90); break;
       case "select": this.tone(660, 0.07, "square", 0.08); break;
       case "confirm": this.tone(523, 0.1, "square", 0.1); this.tone(784, 0.15, "square", 0.1, 0.07); break;
       case "move": this.tone(440, 0.04, "square", 0.05); break;

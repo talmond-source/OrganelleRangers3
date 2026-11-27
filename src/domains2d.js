@@ -1052,6 +1052,94 @@ const DOMAINS = {
       };
     },
   },
+
+  /* ---------- Cytoplasm: Motor Protein Puller. The arena floods with cytosol; kinesin and dynein walk opposite ways on a microtubule ---------- */
+  cytoplasm: {
+    name: "MOTOR PROTEIN PULLER", col: "#3f7bff", gold: "#7fe8ff", mote: "#a8d8ff", dur: 7.1, shatter: 6.3, pull: 6.05, dim: 0.06,
+    glow: [195, 120, 160, "#9ff5ff"],
+    mv: { knock: [3, 6] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { tide: 1.45, flood: 1.55, float: 1.75, mt: 2.2, bind: 2.55, walk: 2.9, step: 0.2, nsteps: 7, snap: 4.6, drain: 4.75, down: 5.3 };
+      const MO = M.motors, rnd = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+      const [bx, top, bw] = defBox(def, "hitHigh"), floatY = 1.05, handY = () => floatY + top * 0.62, baseW = bw * 0.82, cx = def.x + bx;
+      const mH = 1.5, mtY = () => handY() - mH; // the microtubule runs below the opponent's hands; the motors stand on it and reach up
+      const surf = (t) => (t < T.drain ? lerp(-0.2, 5.5, easeOut(seg(t, T.flood, T.flood + 0.6))) : lerp(5.5, -0.3, easeIn(seg(t, T.drain, T.drain + 0.55))));
+      const steps = (t) => Math.max(0, Math.min(T.nsteps, Math.floor((t - T.walk) / T.step) + 1));
+      const stepU = (t) => { if (t < T.walk) return 0; const n = steps(t); if (n >= T.nsteps) return T.nsteps; return n - 1 + easeOut(seg(t - T.walk - (n - 1) * T.step, 0, T.step * 0.7)); };
+      const sep = (t) => baseW + 0.36 * stepU(t); // distance between the two hands
+      const oy = (t) => (t < T.float ? 0 : t < T.snap ? lerp(0, floatY, easeOut(seg(t, T.float, T.float + 0.5))) + Math.sin(t * 2.6) * 0.05 * (t < T.bind ? 1 : 0.3) : floatY * (1 - easeIn(seg(t, T.snap + 0.1, T.down))));
+      const kx = (t) => (t < T.snap ? sep(t) / baseW : 1 + (sep(T.snap) / baseW - 1) * Math.max(-0.12, spring(t - T.snap, 7, 26)));
+      const motor = (g, kind, x, t, frame, a) => { // kind 0 = kinesin, walks toward (+); 1 = dynein, toward (-)
+        const fr = MO.frames[kind * 2 + 1], px = VIEW.S * mH / fr[3], dir = kind ? -s : s; domStrip(g, IM.motors, MO, kind * 2 + frame, VIEW.sx(x), VIEW.sy(mtY()), px, { flip: dir, alpha: a });
+      };
+      const hands = (t) => { const w = sep(Math.min(t, T.snap)) / 2; return [cx + s * w, cx - s * w]; }; // [+ side (kinesin), - side (dynein)]
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.tide, 2], [T.walk - 0.1, 3], [T.down, 1]],
+        camera(t) {
+          if (t < T.flood) return { x: att.x + s * 0.25 + (mid - att.x) * ss(t, D.expand, D.expand + 0.7) * 0.5, S: lerp(150, 110, ss(t, D.expand, D.expand + 0.7)) };
+          if (t < T.snap) { const k = ss(t, T.flood, T.mt + 0.3); return { x: lerp((att.x + mid) / 2, cx, k), S: lerp(110, 96, k) - 10 * ss(t, T.walk, T.snap) }; }
+          const k = ss(t, T.snap, T.snap + 0.4); return { x: lerp(cx, mid, k), S: lerp(86, 100, k) + 8 * spring(t - T.snap, 6, 18) };
+        },
+        step(t) {
+          if (c.once("flood", T.flood)) { game.sfx("whoosh"); game.sfx("splash"); VIEW.shake = 0.3; }
+          if (c.once("mt", T.mt)) game.sfx("charge");
+          if (c.once("bind", T.bind)) { game.sfx("block"); def.flash = 0.1; }
+          for (let i = 0; i < T.nsteps; i++) if (c.once("st" + i, T.walk + i * T.step)) { game.sfx(i % 2 ? "land" : "block"); VIEW.shake = 0.12 + i * 0.03; def.flash = 0.06; if (i === T.nsteps - 1) game.sfx("creak"); }
+          if (t > T.walk + T.nsteps * T.step && t < T.snap && Math.random() < 0.3) VIEW.shake = 0.15;
+          if (c.once("snap", T.snap)) { c.freeze = 0.12; VIEW.impact = 0.15; VIEW.shake = 0.8; FX2D.cx = VIEW.sx(cx) / VIEW_W; FX2D.cy = VIEW.sy(handY()) / VIEW_H; game.sfx("boing"); game.sfx("impact"); def.flash = 0.2; }
+          if (c.once("drain", T.drain)) game.sfx("splash");
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(def.x, 8); }
+        },
+        drawDef(g, t) {
+          if (t < T.float) return X.drawDefIdle(g, t);
+          const y = oy(t), key = t < T.bind ? "hitHigh" : t < T.down ? "hitHigh" : "down";
+          if (t < T.down) return defMorph(g, def, key, def.x, y, { kx: kx(t), ky: 1 - 0.18 * (kx(t) - 1) / 1.2, cy: top * 0.6, rot: t < T.bind ? Math.sin(t * 1.7) * 0.06 : 0, flash: def.flash });
+          const u = t - T.down; defPose(g, def, "down", def.x, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.15 * spring(u, 8, 20)) });
+        },
+        drawProps(g, t) {
+          // the microtubule: a hollow tube of alternating alpha/beta tubulin, (-) end and (+) end
+          if (t >= T.mt && t < T.snap + 0.4) {
+            const a = 1 - seg(t, T.snap + 0.1, T.snap + 0.4), slide = easeOut(seg(t, T.mt, T.mt + 0.35)), L = 4.6, x0 = cx - L + s * (1 - slide) * -6, x1 = cx + L + s * (1 - slide) * -6;
+            const ya = VIEW.sy(mtY()), r = 0.1 * VIEW.S, sa = VIEW.sx(Math.min(x0, x1)), sb = VIEW.sx(Math.max(x0, x1));
+            g.save(); g.globalAlpha = a; g.fillStyle = "#140a24"; g.fillRect(sa, ya - r - 3, sb - sa, 2 * r + 6);
+            const seg8 = 0.085 * VIEW.S; for (let x = sa, i = 0; x < sb; x += seg8, i++) { g.fillStyle = i % 2 ? "#9fe8ff" : "#5cc4f0"; g.fillRect(x, ya - r, Math.min(seg8, sb - x) - 1, 2 * r); }
+            g.fillStyle = "rgba(255,255,255,.45)"; g.fillRect(sa, ya - r * 0.7, sb - sa, r * 0.3);
+            const lab = (txt, x, col) => { g.font = "22px P2, monospace"; g.textAlign = "center"; g.lineWidth = 6; g.strokeStyle = "#140a24"; g.strokeText(txt, x, ya + 7); g.fillStyle = col; g.fillText(txt, x, ya + 7); };
+            const plusX = VIEW.sx(cx + s * (L - 0.35) + s * (1 - slide) * -6), minusX = VIEW.sx(cx - s * (L - 0.35) + s * (1 - slide) * -6);
+            lab("+", clamp(plusX, 20, VIEW_W - 20), "#ffd36b"); lab("–", clamp(minusX, 20, VIEW_W - 20), "#c98bff"); g.restore();
+          }
+          // the motors: they bind to the track beside each hand, then walk apart in opposite directions
+          if (t >= T.bind - 0.25 && t < T.snap + 0.5) {
+            const [hp, hm] = hands(t), a = Math.min(1, (t - T.bind + 0.25) / 0.15), drop = (1 - easeIn(seg(t, T.bind - 0.25, T.bind))) * 1.5;
+            const f = t < T.walk || t > T.walk + T.nsteps * T.step ? 1 : Math.floor((t - T.walk) / (T.step / 2)) % 2 ? 1 : 0;
+            if (t < T.snap) { g.save(); g.translate(0, -drop * VIEW.S); motor(g, 1, hm - s * 0.25, t, f, a); motor(g, 0, hp - s * 0.1, t, f, a); g.restore(); }
+            else { const u = seg(t, T.snap, T.snap + 0.5); g.save(); g.globalAlpha = 1 - u; motor(g, 1, hm - s * (0.25 + 2.5 * u), t, 0, 1); motor(g, 0, hp + s * (2.5 * u - 0.1), t, 0, 1); g.restore(); }
+          }
+          // the cytosol: a gel that floods the arena
+          if (t >= T.flood) {
+            const sy = VIEW.sy(surf(t)); if (sy < FLOOR_Y + 20) {
+              g.save(); g.fillStyle = "rgba(60,140,255,.2)"; g.fillRect(-40, sy, VIEW_W + 80, VIEW_H - sy + 40);
+              g.strokeStyle = "rgba(220,245,255,.85)"; g.lineWidth = 4; g.beginPath(); for (let x = -20; x <= VIEW_W + 20; x += 12) { const y = sy + Math.sin(x * 0.02 + t * 5) * 6 + Math.sin(x * 0.05 - t * 3) * 3; x === -20 ? g.moveTo(x, y) : g.lineTo(x, y); } g.stroke();
+              for (let i = 0; i < 30; i++) { const k = (t * (0.25 + rnd(i, 1) * 0.3) + rnd(i, 2)) % 1, bx2 = rnd(i, 3) * VIEW_W + Math.sin(t * 2 + i) * 10, by = lerp(FLOOR_Y, sy, k); if (by < sy) continue; const r2 = 3 + rnd(i, 4) * 6; g.strokeStyle = "rgba(220,245,255,.7)"; g.lineWidth = 2; g.beginPath(); g.arc(bx2, by, r2, 0, TAU); g.stroke(); }
+              g.restore(); }
+          }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          pop("SUBMERGE!", T.flood + 0.1, VIEW.sx(mid), Math.max(120, VIEW.sy(3.0)), 56, "#bfe9ff", -0.05, 0.6);
+          pop("BIND!", T.bind, VIEW.sx(cx), Math.max(110, VIEW.sy(handY() + 1.0)), 44, "#ffffff", 0.06, 0.35);
+          for (let i = 0; i < T.nsteps; i++) pop("STEP!", T.walk + i * T.step, VIEW.sx(cx) + (i % 2 ? 1 : -1) * 130, Math.max(110, VIEW.sy(handY() + 0.9 + (i % 3) * 0.15)), 34 + i * 3, i % 2 ? "#ffd36b" : "#c98bff", i % 2 ? 0.1 : -0.1, 0.22);
+          pop("SNAP!", T.snap, VIEW.sx(cx), Math.max(120, VIEW.sy(handY() + 0.9)), 72, "#ffffff", -0.06, 0.6);
+          if (t > T.bind + 0.1 && t < T.snap) { // the motor labels and the distance they've walked
+            const [hp, hm] = hands(t), n = steps(t), lab = (txt, x, col) => { g.save(); g.font = "12px P2, monospace"; g.textAlign = "center"; g.lineWidth = 5; g.strokeStyle = "#140a24"; const y = VIEW.sy(mtY()) + 34; g.strokeText(txt, x, y); g.fillStyle = col; g.fillText(txt, x, y); g.restore(); };
+            lab((s > 0 ? "" : "+ ← ") + "KINESIN" + (s > 0 ? " → +" : ""), VIEW.sx(hp), "#ffd36b"); lab((s > 0 ? "– ← " : "") + "DYNEIN" + (s > 0 ? "" : " → –"), VIEW.sx(hm - s * 0.25), "#c98bff");
+            if (n > 0) { const txt = "EACH WALKED " + n * 8 + " nm"; g.save(); g.font = "14px P2, monospace"; g.textAlign = "center"; g.lineWidth = 5; g.strokeStyle = "#140a24"; const y = VIEW.sy(mtY()) + 60; g.strokeText(txt, VIEW.sx(cx), y); g.fillStyle = "#ffffff"; g.fillText(txt, VIEW.sx(cx), y); g.restore(); }
+          }
+        },
+      };
+    },
+  },
 };
 
 function domainCine(game, att, def) {

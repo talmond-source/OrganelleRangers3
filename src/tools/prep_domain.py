@@ -62,6 +62,12 @@ Lytic Hive (phage, the boss):
   poses.png   2 x 2 Phage Ranger poses: hand sign (triangle), expansion, command, boss finish. keep_all, so the six
               tail fibres survive even where they don't touch the body
   props.png   2 x 2 T4 phage: whole (sheath extended), injecting (sheath contracted), head only, tail only
+
+Motor Protein Puller (cytoplasm):
+  bg.png      the cytoskeleton: microtubules radiating from a centrosome, cortical actin mesh, intermediate filaments
+  poses.png   2 x 2 Cytoplasm Ranger poses: hand sign (fingers interlaced), expansion, raise the tide, pull apart
+  motors.png  2 x 2: kinesin mid-stride, kinesin planted, dynein mid-stride, dynein planted (walking right, feet on
+              the bottom line). The gel and the microtubule are drawn in code
 """
 import os, sys, json
 import numpy as np
@@ -258,6 +264,17 @@ def phage(meta):
     meta['phage'] = m
 
 
+def cytoplasm(meta):
+    src, dst = os.path.join(SRC, 'cytoplasm'), os.path.join(DST, 'cytoplasm'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 790}
+    m['poses'] = ranger_poses(src, dst)
+    cc = [clean_white(c) for c in cells(os.path.join(src, 'motors.png'), 2, 2)]
+    b0 = bbox(cc[1]); sheet, info = strip(cc, 220 / (b0[3] - b0[1] + 1)); sheet.save(os.path.join(dst, 'motors.png'), optimize=True); m['motors'] = info
+    meta['cytoplasm'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -269,6 +286,7 @@ def main():
     dna(meta)
     mitosis(meta)
     phage(meta)
+    cytoplasm(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

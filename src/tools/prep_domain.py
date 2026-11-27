@@ -333,6 +333,21 @@ def atp(meta):
     meta['atp'] = m
 
 
+def membrane(meta):
+    """Endocytosis Entrapment (membrane): bg.png a pinball table built from a bilayer (heads out, tails in, cholesterol
+    among the tails, channel proteins, sugar chains on one face only); poses.png hand sign (bubble), expansion, wrap,
+    pinball smack; props.png 2 x 2: channel-protein bumper, bumper lit, phospholipid (two tails), glycoprotein.
+    The bilayer sheet, the flaps and the vesicle are drawn in code."""
+    src, dst = os.path.join(SRC, 'membrane'), os.path.join(DST, 'membrane'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 760}
+    m['poses'] = ranger_poses(src, dst)
+    cc = [clean_white(c, keep_all=(i == 1)) for i, c in enumerate(cells(os.path.join(src, 'props.png'), 2, 2))]
+    b0 = bbox(cc[0]); sheet, info = strip(cc, 200 / (b0[2] - b0[0] + 1)); sheet.save(os.path.join(dst, 'props.png'), optimize=True); m['props'] = info
+    meta['membrane'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -348,6 +363,7 @@ def main():
     ribosome(meta)
     lysosome(meta)
     atp(meta)
+    membrane(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

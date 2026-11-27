@@ -1454,6 +1454,94 @@ const DOMAINS = {
       };
     },
   },
+
+  /* ---------- Membrane: Endocytosis Entrapment. The bilayer folds up round the opponent, pinches off into a vesicle, and pinballs off the bumpers ---------- */
+  membrane: {
+    name: "ENDOCYTOSIS ENTRAPMENT", col: "#ff3fa4", gold: "#3ff0ff", mote: "#ff9ad0", dur: 7.0, shatter: 6.2, pull: 5.95, dim: 0.06,
+    glow: null,
+    mv: { knock: [3, 6] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { sheet: 1.35, wrap: 1.5, pinch: 2.05, smack: 2.3, leg: 0.36, burst: 0, down: 0 };
+      const PR = M.props, [bx, top] = defBox(def, "hitBody"), cx = def.x + bx, VR = 0.95, inScale = 0.62, startY = VR + 0.05;
+      const ceil = () => (FLOOR_Y - 118) / VIEW.S - VR, lim = (x) => clamp(x, -HALF + 1.0, HALF - 1.0);
+      const bumpers = [[lim(mid + s * 0.3), 2.7], [lim(cx + s * 1.2), 1.75], [lim(mid - s * 0.45), 1.55]];
+      const route = () => [[cx, startY], [lim(cx - s * 1.0), VR], bumpers[0], [lim(mid + s * 1.4), ceil()], bumpers[1], [lim(cx + s * 0.2), VR], bumpers[2], [lim(mid - s * 0.2), ceil()], [lim(cx - s * 0.3), VR]];
+      let R0 = null; const legs = () => (R0 || (R0 = route())).length - 1;
+      T.burst = T.smack + legs() * T.leg; T.down = T.burst + 0.3;
+      const hitAt = (k) => T.smack + k * T.leg; // arriving at waypoint k
+      const ves = (t) => { const pts = R0 || (R0 = route()); if (t < T.smack) return [cx, startY + (t > T.pinch ? ss(t, T.pinch, T.smack) * 0.1 : 0), 0];
+        const k = Math.min(legs() - 1, Math.floor((t - T.smack) / T.leg)), u = clamp((t - T.smack - k * T.leg) / T.leg), a = pts[k], b = pts[k + 1]; return [lerp(a[0], b[0], u), lerp(a[1], b[1], u), k]; };
+      const squash = (t) => { for (let k = 1; k <= legs(); k++) { const d = t - hitAt(k); if (d >= 0 && d < 0.25) return { k, v: 0.3 * spring(d, 10, 30) }; } return { k: 0, v: 0 }; };
+      const hits = (t) => [...Array(legs()).keys()].filter((k) => t >= hitAt(k + 1)).length;
+      const S = () => VIEW.S, HD = 0.2, GAP = 0.36; // head radius and the gap between the two leaflets (m)
+      // a bilayer along a path P(u): two rows of round heads facing out, two tails each pointing in
+      const bilayer = (g, Pth, n, a = 1) => {
+        g.save(); g.globalAlpha *= a;
+        const pts = Array.from({ length: n + 1 }, (_, i) => { const u = i / n, p = Pth(u), q = Pth(Math.min(1, u + 0.01)), r = Pth(Math.max(0, u - 0.01)); let tx = q[0] - r[0], ty = q[1] - r[1]; const L = Math.hypot(tx, ty) || 1; return { p, nx: -ty / L, ny: tx / L }; });
+        for (const side of [1, -1]) for (const { p, nx, ny } of pts) { const hx = VIEW.sx(p[0] + nx * side * GAP / 2), hy = VIEW.sy(p[1] + ny * side * GAP / 2), tx = VIEW.sx(p[0] + nx * side * 0.02), ty = VIEW.sy(p[1] + ny * side * 0.02);
+          g.strokeStyle = "#ffcc1a"; g.lineWidth = 3.5; for (const o of [-3.5, 3.5]) { g.beginPath(); g.moveTo(hx + o * ny, hy + o * nx); g.lineTo(tx + o * ny, ty + o * nx); g.stroke(); } }
+        for (const side of [1, -1]) for (const { p, nx, ny } of pts) { const hx = VIEW.sx(p[0] + nx * side * GAP / 2), hy = VIEW.sy(p[1] + ny * side * GAP / 2), r = HD * S() * 0.55;
+          g.fillStyle = "#ff3fa4"; g.strokeStyle = "#3a0626"; g.lineWidth = 2; g.beginPath(); g.arc(hx, hy, r, 0, TAU); g.fill(); g.stroke(); g.fillStyle = "rgba(255,255,255,.5)"; g.beginPath(); g.arc(hx - r * 0.3, hy - r * 0.35, r * 0.3, 0, TAU); g.fill(); }
+        g.restore();
+      };
+      const flap = (side, k) => (u) => { // a flap of membrane: flat on the floor (k=0) to wrapped round the opponent (k=1)
+        const W = VR * 1.9, flat = [cx + side * (VR * 0.15 + u * W), 0.05], ang = -Math.PI / 2 + side * (Math.PI / 2) * 0 + side * u * Math.PI, wr = [cx + side * Math.sin(u * Math.PI) * VR, startY - Math.cos(u * Math.PI) * VR];
+        return [lerp(flat[0], wr[0], k), lerp(flat[1], wr[1], k)]; };
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.wrap - 0.1, 2], [T.smack - 0.06, 3], [T.burst + 0.2, 1]],
+        camera(t) {
+          if (t < T.smack) { const k = ss(t, D.expand, D.expand + 0.6); return { x: lerp(att.x + s * 0.25, (att.x + cx) / 2 + s * 0.3, k), S: lerp(150, 104, k) }; }
+          const k = ss(t, T.smack, T.smack + 0.4); return { x: lerp((att.x + cx) / 2 + s * 0.3, mid + s * 0.2, k), S: lerp(104, 86, k) + 6 * squash(t).v };
+        },
+        step(t) {
+          if (c.once("sheet", T.sheet)) game.sfx("whoosh");
+          if (c.once("pinch", T.pinch)) { game.sfx("pop"); VIEW.shake = 0.3; VIEW.flash = 0.04; }
+          if (c.once("smack", T.smack)) { c.freeze = 0.08; VIEW.shake = 0.5; game.sfx("impact"); }
+          for (let k = 1; k <= legs(); k++) if (c.once("h" + k, hitAt(k))) { const pt = R0[k], isB = bumpers.some((b) => b === pt); c.freeze = 0.04; VIEW.shake = 0.3 + k * 0.03; game.sfx(isB ? "ding" : "boing"); if (isB) game.sfx("zap"); def.flash = 0.1; P.hit(V3(pt[0], pt[1], 0), isB ? "#3ff0ff" : "#ff3fa4", 1); }
+          if (c.once("burst", T.burst)) { c.freeze = 0.12; VIEW.impact = 0.15; VIEW.shake = 0.8; const [x, y] = ves(T.burst - 0.001); FX2D.cx = VIEW.sx(x) / VIEW_W; FX2D.cy = VIEW.sy(y) / VIEW_H; game.sfx("pop"); game.sfx("boom"); def.flash = 0.2; }
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(ves(T.burst - 0.001)[0], 8); }
+        },
+        drawBack(g, t) { // the bumpers: channel proteins, lit when the vesicle hits them
+          if (t < T.pinch) return; const a = Math.min(1, (t - T.pinch) / 0.25) * (1 - seg(t, D.shatter - 0.3, D.shatter));
+          bumpers.forEach((b, i) => { const k = R0 ? R0.indexOf(b) : -1, lit = k > 0 && t >= hitAt(k) && t < hitAt(k) + 0.35, pop = lit ? 1 + 0.15 * spring(t - hitAt(k), 10, 30) : backOut(seg(t, T.pinch + i * 0.08, T.pinch + i * 0.08 + 0.3)), f = PR.frames[0], px = S() * 0.9 / f[2] * pop;
+            const bx2 = VIEW.sx(b[0]), by2 = VIEW.sy(b[1]), rr = S() * 0.62 * pop; g.save(); g.globalAlpha *= a; g.globalCompositeOperation = "lighter"; const gl = g.createRadialGradient(bx2, by2, rr * 0.4, bx2, by2, rr * 1.3); gl.addColorStop(0, lit ? "rgba(120,255,255,.7)" : "rgba(63,240,255,.35)"); gl.addColorStop(1, "rgba(63,240,255,0)"); g.fillStyle = gl; g.beginPath(); g.arc(bx2, by2, rr * 1.3, 0, TAU); g.fill(); g.globalCompositeOperation = "source-over"; g.strokeStyle = lit ? "#ffffff" : "#3ff0ff"; g.lineWidth = 4; g.beginPath(); g.arc(bx2, by2, rr, 0, TAU); g.stroke(); g.restore();
+            domCentered(g, IM.props, PR, lit ? 1 : 0, bx2, by2, px, { alpha: a }); });
+        },
+        drawDef(g, t) {
+          if (t < T.wrap) return X.drawDefIdle(g, t);
+          if (t < T.burst) { // curled up inside the vesicle
+            const [x, y] = ves(t), k = ss(t, T.wrap, T.pinch), sc = lerp(1, inScale, k), sq = squash(t).v, rot = t > T.smack ? (t - T.smack) * 9 * s : 0;
+            return defMorph(g, def, "hitBody", x - bx, y - top * 0.5, { kx: sc * (1 + sq), ky: sc * (1 - sq), rot, cy: top * 0.5, flash: def.flash });
+          }
+          if (t < T.down) { const [x, y] = ves(T.burst - 0.001), u = seg(t, T.burst, T.down); return defPose(g, def, "launch", x - bx, lerp(y - top * 0.5, 0, easeIn(u)), { flash: def.flash, rot: s * u * 0.6 }); }
+          const u = t - T.down, [x] = ves(T.burst - 0.001); defPose(g, def, "down", x - bx, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.15 * spring(u, 8, 20)) });
+        },
+        drawProps(g, t) {
+          if (t >= T.sheet && t < T.pinch + 0.05) { // the bilayer sheet on the floor, folding up round the opponent
+            const a = Math.min(1, (t - T.sheet) / 0.15), k = easeOut(seg(t, T.wrap, T.pinch)); bilayer(g, flap(-1, k), 13, a); bilayer(g, flap(1, k), 13, a);
+          }
+          if (t >= T.pinch && t < T.burst) { // the vesicle: a closed bilayer bubble
+            const [x, y] = ves(t), sq = squash(t).v; g.save(); g.fillStyle = "rgba(255,120,200,.14)"; g.beginPath(); g.ellipse(VIEW.sx(x), VIEW.sy(y), VR * S() * (1 + sq), VR * S() * (1 - sq), 0, 0, TAU); g.fill(); g.restore();
+            const pop = t < T.pinch + 0.2 ? 1 + 0.12 * spring(t - T.pinch, 10, 30) : 1, rot = t > T.smack ? (t - T.smack) * 2 : 0;
+            bilayer(g, (u) => { const a2 = u * TAU + rot; return [x + Math.cos(a2) * VR * pop * (1 + sq), y + Math.sin(a2) * VR * pop * (1 - sq)]; }, 26);
+            if (t > T.smack) { const [px2, py2] = ves(t - 0.06); g.save(); g.globalCompositeOperation = "lighter"; g.strokeStyle = "rgba(255,120,220,.35)"; g.lineWidth = VR * S() * 1.4; g.lineCap = "round"; g.beginPath(); g.moveTo(VIEW.sx(px2), VIEW.sy(py2)); g.lineTo(VIEW.sx(x), VIEW.sy(y)); g.stroke(); g.restore(); }
+          }
+          if (t >= T.burst && t < T.burst + 0.8) { // POP: loose phospholipids scatter
+            const [x, y] = ves(T.burst - 0.001), u = seg(t, T.burst, T.burst + 0.8), f = PR.frames[2], px = S() * 0.3 / f[3];
+            for (let i = 0; i < 12; i++) { const an = i / 12 * TAU, d = (VR + 2.2 * easeOut(u)) * S(); domCentered(g, IM.props, PR, 2, VIEW.sx(x) + Math.cos(an) * d, VIEW.sy(y) + Math.sin(an) * d + 200 * u * u, px, { rot: an + Math.PI / 2 + u * 6, alpha: 1 - seg(u, 0.6, 1) }); }
+          }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          pop("ENDOCYTOSIS!", T.wrap, VIEW.sx(cx), Math.max(110, VIEW.sy(2.9)), 50, "#ff9ad0", -0.05, 0.55);
+          pop("PINCH OFF!", T.pinch, VIEW.sx(cx), Math.max(110, VIEW.sy(2.9)), 54, "#ffffff", 0.05, 0.4);
+          for (let k = 1; k <= legs(); k++) { const pt = R0 ? R0[k] : [0, 0], isB = R0 && bumpers.includes(pt); pop(isB ? k + " HITS! BUMPER!" : (k === 1 ? "1 HIT!" : k + " HITS!"), hitAt(k), VIEW.sx(pt[0]) + (k % 2 ? 1 : -1) * 90, Math.max(110, VIEW.sy(pt[1] + 1.2)), 30 + k * 2, isB ? "#3ff0ff" : "#ff9ad0", k % 2 ? 0.08 : -0.08, 0.32); }
+          pop("POP!", T.burst, VIEW.sx(ves(T.burst - 0.001)[0]), Math.max(110, VIEW.sy(2.8)), 72, "#ffffff", -0.06, 0.6);
+        },
+      };
+    },
+  },
 };
 
 function domainCine(game, att, def) {

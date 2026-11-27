@@ -314,6 +314,25 @@ def lysosome(meta):
     meta['lysosome'] = m
 
 
+def atp(meta):
+    """Turbine Trap (atp): bg.png a mitochondrion power station (bilayer membrane, dense H+ above, ATP synthase heads
+    hanging into the matrix); poses.png hand sign (three fingers), expansion, slam down, power up; props.png 2 x 2:
+    rotor wheel, rotor spinning (unused: the game spins the still wheel), head on its stalk, energy orb.
+    The wheel's empty middle is white trapped by thin spokes, so every near-white pixel in that frame is cleared."""
+    src, dst = os.path.join(SRC, 'atp'), os.path.join(DST, 'atp'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 790}
+    m['poses'] = ranger_poses(src, dst)
+    cc = cells(os.path.join(src, 'props.png'), 2, 2)
+    w = clean_white(cc[0]); rgb = cc[0][..., :3].astype(int); x0, y0, x1, y1 = bbox(w); ccx, ccy, rr = (x0 + x1) / 2, (y0 + y1) / 2, (x1 - x0) / 2
+    yy, xx = np.mgrid[:w.shape[0], :w.shape[1]]; inner = np.hypot(xx - ccx, yy - ccy) < rr * 0.8  # only inside the ring
+    w[inner & (rgb.min(-1) >= 215) & (rgb.max(-1) - rgb.min(-1) < 30), 3] = 0
+    out = [w, clean_white(cc[2]), clean_white(cc[3], keep_all=True)]
+    b0 = bbox(out[0]); sheet, info = strip(out, 300 / (b0[2] - b0[0] + 1)); sheet.save(os.path.join(dst, 'props.png'), optimize=True); m['props'] = info
+    meta['atp'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -328,6 +347,7 @@ def main():
     cytoplasm(meta)
     ribosome(meta)
     lysosome(meta)
+    atp(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

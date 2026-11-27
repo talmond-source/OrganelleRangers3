@@ -18,13 +18,13 @@ const spring = (u, k = 9, w = 26) => (u < 0 ? 0 : Math.exp(-u * k) * Math.cos(u 
 
 /* one frame of a domain strip (frames side by side, feet on a shared base line) with its feet at screen (sx, sy) */
 function domStrip(g, img, M, frame, sx, sy, px, o = {}) {
-  const [cw, ch] = M.cell; g.save(); g.globalAlpha = o.alpha ?? 1; g.translate(sx, sy); if (o.rot) g.rotate(o.rot);
+  const [cw, ch] = M.cell; g.save(); g.globalAlpha *= o.alpha ?? 1; g.translate(sx, sy); if (o.rot) g.rotate(o.rot);
   g.scale((o.flip || 1) * px * (o.kx || 1), px * (o.ky || 1)); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
   g.drawImage(img, frame * cw, 0, cw, ch, -cw / 2 + (o.dx || 0), -M.base, cw, ch); g.restore();
 }
 /* the same, centred on the frame's own picture (for props that spin and squash about their middle) */
 function domCentered(g, img, M, frame, cx, cy, px, o = {}) {
-  const [cw] = M.cell, [ox, oy, w, h] = M.frames[frame]; g.save(); g.globalAlpha = o.alpha ?? 1; g.translate(cx, cy); if (o.rot) g.rotate(o.rot);
+  const [cw] = M.cell, [ox, oy, w, h] = M.frames[frame]; g.save(); g.globalAlpha *= o.alpha ?? 1; g.translate(cx, cy); if (o.rot) g.rotate(o.rot);
   g.scale(px * (o.kx || 1), px * (o.ky || 1)); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = "high";
   g.drawImage(img, frame * cw + ox, oy, w, h, -w / 2, -h / 2, w, h); g.restore();
 }
@@ -1358,6 +1358,98 @@ const DOMAINS = {
             const bw2 = W - 20, k = clamp((7.2 - p) / 2.2); g.fillStyle = "#333"; g.fillRect(x0 + 10, y0 + Hh - 8, bw2, 4); g.fillStyle = indicator(p); g.fillRect(x0 + 10, y0 + Hh - 8, bw2 * k, 4); g.restore();
           }
           if (t > T.digest && t < T.spit + 0.4) { const n = Math.min(T.nb, Math.floor((t - T.digest) / T.bite + 0.45)), txt = "RECYCLED: " + n; g.save(); g.font = "16px P2, monospace"; g.textAlign = "center"; g.lineWidth = 6; g.strokeStyle = "#1a0b2e"; const x = VIEW.sx(cx), y = VIEW.sy(bcy(t) - R - 0.2) + 10; g.strokeText(txt, x, Math.min(FLOOR_Y + 30, y)); g.fillStyle = "#c8ff3a"; g.fillText(txt, x, Math.min(FLOOR_Y + 30, y)); g.restore(); }
+        },
+      };
+    },
+  },
+
+  /* ---------- ATP: Turbine Trap. The opponent runs inside ATP synthase's rotor in place of the proton flow; every turn makes 3 ATP, which heal the Ranger ---------- */
+  atp: {
+    name: "TURBINE TRAP", col: "#2fd46a", gold: "#ffe14d", mote: "#ff6a3c", dur: 7.2, shatter: 6.4, pull: 6.15, dim: 0.06,
+    glow: [836, 40, 500, "#ff6a3c"],
+    mv: { knock: [4, 7] }, heal: 12,
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { slam: 1.3, drop: 1.4, land: 1.65, run: 1.85, maxv: 4.4, fling: 4.75, down: 5.3 };
+      const PR = M.props, [bx, top] = defBox(def, "idle"), cx = def.x + bx, R = Math.max(1.35, top * 0.6), WY = R; const landX = clamp(cx - bx + s * 2.2, -HALF + 0.9, HALF - 0.9) - (cx - bx); // the wheel stands on the floor around the opponent
+      const rev = (t) => { // turns completed: speed ramps from 0.6 to 2.4 turns a second
+        if (t < T.run) return 0; const tt = Math.min(t, T.fling) - T.run, Tm = T.maxv - T.run, a = (2.4 - 0.6) / Tm;
+        return tt < Tm ? 0.6 * tt + a * tt * tt / 2 : 0.6 * Tm + a * Tm * Tm / 2 + 2.4 * (tt - Tm); };
+      const spin = (t) => rev(t) * TAU * -def.face; // the rim under the runner's feet slides backwards
+      const made = (t) => Math.floor(rev(t) * 3); // 3 ATP per turn (one per third of a turn)
+      const NA = 18, atpT = []; // when each ATP is made, found by stepping the turn count
+      for (let t = T.run, k = 0; t < T.fling && k < NA; t += 0.005) if (made(t) > k) { atpT.push(t); k++; }
+      const HEAD = () => { const f = PR.frames[1], h = (R + 1.05), px = VIEW.S * h / f[3]; return { px, h, top: WY + h * 0.45 }; }; // stalk cap at the hub, head above the wheel
+      const headPos = () => [cx, WY + HEAD().h * 0.76];
+      const fly = 0.55, atpPos = (j, t) => { const u = easeIn(seg(t, atpT[j], atpT[j] + fly)), [hx, hy] = headPos(), tx = att.x, ty = 1.3; return [lerp(hx - s * 0.6, tx, u), lerp(hy, ty, u) + Math.sin(u * Math.PI) * 0.6, u]; };
+      let healed = 0;
+      const molecule = (g, x, y, nP, sc = 1, a = 1) => { // ATP / ADP: adenine (two rings), ribose (pentagon), and 2 or 3 phosphates
+        g.save(); g.globalAlpha = a; g.translate(x, y); g.scale(sc, sc); g.lineWidth = 2.5; g.strokeStyle = "#0d2a14";
+        const poly = (cx2, cy2, n, r, col) => { g.fillStyle = col; g.beginPath(); for (let k = 0; k < n; k++) { const an = k / n * TAU - Math.PI / 2; g.lineTo(cx2 + Math.cos(an) * r, cy2 + Math.sin(an) * r); } g.closePath(); g.fill(); g.stroke(); };
+        poly(-24, -6, 6, 8, "#5aa0ff"); poly(-12, -9, 5, 7, "#5aa0ff"); poly(-4, 6, 5, 8, "#ff9a3c");
+        for (let k = 0; k < nP; k++) { const px = 10 + k * 12; g.fillStyle = "#ffe14d"; g.beginPath(); g.arc(px, 8, 6, 0, TAU); g.fill(); g.stroke(); g.fillStyle = "#0d2a14"; g.font = "8px P2, monospace"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillText("P", px, 8.5); }
+        g.restore();
+      };
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.slam - 0.15, 2], [T.run, 3]],
+        camera(t) {
+          if (t < T.run) { const k = ss(t, D.expand, D.expand + 0.6); return { x: lerp(att.x + s * 0.25, mid, k), S: lerp(150, 92, k) + 10 * spring(t - T.land, 6, 18) * (t > T.land ? 1 : 0) }; }
+          if (t < T.fling) { const k = ss(t, T.run, T.run + 0.4); return { x: lerp(mid, mid + s * 0.3, k), S: 92 + 6 * ss(t, T.maxv - 0.5, T.fling) + Math.sin(t * 40) * 1.5 * ss(t, T.maxv - 0.5, T.fling) }; }
+          const k = ss(t, T.fling, T.fling + 0.3); return { x: lerp(mid + s * 0.3, mid + s * 0.8, k), S: lerp(98, 96, k) + 9 * spring(t - T.fling, 6, 18) };
+        },
+        step(t) {
+          if (c.once("drop", T.drop)) game.sfx("whoosh");
+          if (c.once("land", T.land)) { c.freeze = 0.08; VIEW.shake = 0.7; game.sfx("boom"); X.grit(cx - R, 6); X.grit(cx + R, 6); def.flash = 0.12; }
+          if (c.once("run", T.run)) game.sfx("charge");
+          for (let j = 0; j < atpT.length; j++) {
+            if (c.once("m" + j, atpT[j])) game.sfx(j % 3 === 2 ? "ding" : "select");
+            if (c.once("a" + j, atpT[j] + fly)) { const add = Math.min(D.heal - healed, D.heal / atpT.length); if (add > 0) { att.hp = Math.min(BAR_HP, att.hp + add); healed += add; } P.spark(V3(att.x, 1.3, 0), "#c8ff3a", 0.12, V3(0, 3, 0), 0.4); }
+          }
+          if (t > T.run && t < T.fling && Math.random() < 0.15 + 0.4 * seg(t, T.run, T.maxv)) game.sfx("zap");
+          if (c.once("fling", T.fling)) { c.freeze = 0.12; VIEW.impact = 0.15; VIEW.shake = 0.9; FX2D.cx = VIEW.sx(cx) / VIEW_W; FX2D.cy = VIEW.sy(WY) / VIEW_H; game.sfx("impact"); game.sfx("boom"); def.flash = 0.2; }
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(cx + landX, 8); }
+        },
+        drawBack(g, t) { // the head on its stalk, behind the wheel and runner
+          if (t < T.drop) return; const H = HEAD(), f = PR.frames[1], a = 1 - seg(t, T.fling + 0.2, T.fling + 0.6), drop = (1 - easeIn(seg(t, T.drop, T.land))) * 6;
+          const capY = WY + drop, cy = VIEW.sy(capY) - (f[3] * 0.5 - 6) * H.px * 1; domCentered(g, IM.props, PR, 1, VIEW.sx(cx), cy, H.px, { alpha: a, rot: t > T.run ? Math.sin(t * 30) * 0.015 * seg(t, T.run, T.maxv) : 0 });
+          if (t >= T.drop && t < T.fling + 0.6) { // the rotor: drops around the opponent, then spins
+            const f = PR.frames[0], px = VIEW.S * 2 * R / f[2], drop = (1 - easeIn(seg(t, T.drop, T.land))) * 6, sq = t > T.land ? 1 - 0.1 * spring(t - T.land, 9, 26) : 1, a = 1 - seg(t, T.fling + 0.2, T.fling + 0.6), lift = t > T.fling ? easeIn(seg(t, T.fling, T.fling + 0.6)) * 5 : 0;
+            const x = VIEW.sx(cx), y = VIEW.sy(WY + drop + lift);
+            domCentered(g, IM.props, PR, 0, x, y, px, { alpha: a, rot: spin(t), ky: sq, kx: 2 - sq });
+            const sp = t > T.run && t < T.fling ? seg(t, T.run, T.maxv) : 0; // speed lines round the rim
+            if (sp > 0) { g.save(); g.globalCompositeOperation = "lighter"; g.strokeStyle = `rgba(255,240,120,${0.25 + 0.5 * sp})`; g.lineWidth = 3; for (let k = 0; k < 6; k++) { const a0 = spin(t) + k * TAU / 6, r = R * VIEW.S * 1.08; g.beginPath(); g.arc(x, y, r, a0, a0 + 0.35 * sp * -def.face, def.face > 0); g.stroke(); } g.restore(); }
+          }
+        },
+        drawDef(g, t) {
+          if (t < T.land) return X.drawDefIdle(g, t);
+          if (t < T.run) return defPose(g, def, "block", cx - bx, 0.18, { flash: def.flash });
+          if (t < T.fling) { // running in the wheel: their own run cycle, faster as the wheel speeds up
+            const ph = Math.floor(rev(t) * 8) % 4, tired = seg(t, T.maxv - 0.6, T.fling), bob = Math.abs(Math.sin(rev(t) * 8 * Math.PI / 2)) * 0.05;
+            if (SPR.motion[def.id]) drawFrame(g, def.id, XM.walk1 + ph, cx - bx, 0.18 + bob, def.face, { motion: true, flash: def.flash, rot: -0.12 * (1 + tired) });
+            else defPose(g, def, ph % 2 ? "hitHigh" : "hitBody", cx - bx, 0.18 + bob, { flash: def.flash });
+            if (tired > 0) for (let k = 0; k < 3; k++) { const u = ((t * 2.5 + k / 3) % 1), sx = VIEW.sx(cx - def.face * (0.35 + u * 0.6)), sy = VIEW.sy(top * 0.9 + 0.2 - u * 0.4); g.save(); g.globalAlpha = tired * (1 - u); g.fillStyle = "#9fe8ff"; g.strokeStyle = "#0d2a14"; g.lineWidth = 2; g.beginPath(); g.moveTo(sx, sy - 9); g.quadraticCurveTo(sx + 7, sy + 3, sx, sy + 6); g.quadraticCurveTo(sx - 7, sy + 3, sx, sy - 9); g.fill(); g.stroke(); g.restore(); }
+            return;
+          }
+          if (t < T.down) { const u = seg(t, T.fling, T.down); return defPose(g, def, "launch", cx - bx + landX * easeOut(u), 0.18 + Math.sin(u * Math.PI) * 1.4, { flash: def.flash, rot: s * u * 1.4 }); }
+          const u = t - T.down; defPose(g, def, "down", cx - bx + landX, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.15 * spring(u, 8, 20)) });
+        },
+        drawProps(g, t) {
+          // ATP: ADP + P snapping together at the head, then streaming to the Ranger to heal
+          for (let j = 0; j < atpT.length; j++) {
+            const t0 = atpT[j]; if (t < t0 - 0.2 || t > t0 + fly) continue; const [hx, hy] = headPos(), sx0 = VIEW.sx(hx - s * 0.6), sy0 = VIEW.sy(hy);
+            if (t < t0) { const u = seg(t, t0 - 0.2, t0); molecule(g, sx0 - 6, sy0, 2, 1.8); g.save(); g.fillStyle = "#ffe14d"; g.strokeStyle = "#0d2a14"; g.lineWidth = 2.5; const px2 = lerp(sx0 + 90, sx0 + 50, u); g.beginPath(); g.arc(px2, sy0 + 14, 10, 0, TAU); g.fill(); g.stroke(); g.restore(); continue; }
+            const [x, y, u] = atpPos(j, t); g.save(); g.globalCompositeOperation = "lighter"; g.fillStyle = "rgba(200,255,90,.35)"; g.beginPath(); g.arc(VIEW.sx(x), VIEW.sy(y), 34, 0, TAU); g.fill(); g.restore(); molecule(g, VIEW.sx(x), VIEW.sy(y), 3, 1.8 - 0.5 * u);
+          }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          const hx = VIEW.sx(cx + s * 0.2);
+          pop("TRAPPED!", T.land, hx + s * 120, Math.max(110, VIEW.sy(2.9)), 54, "#ffe14d", -0.06, 0.5);
+          pop("RUN!", T.run + 0.1, hx + s * 150, Math.max(110, VIEW.sy(2.6)), 60, "#ffffff", 0.08, 0.45);
+          pop("TURBINE TRAP!", T.fling, VIEW.sx(cx + s * 1.2), Math.max(120, VIEW.sy(2.8)), 62, "#2fd46a", -0.05, 0.7);
+          for (let j = 2; j < atpT.length; j += 3) { const [x, y] = atpPos(j, atpT[j] + fly * 0.99); pop("+HP", atpT[j] + fly, VIEW.sx(att.x), Math.max(110, VIEW.sy(2.4)), 32, "#c8ff3a", -0.05, 0.35); }
+          if (t > T.run && t < T.fling + 0.6) { const n = made(t), txt = "ATP MADE: " + n; g.save(); g.font = "18px P2, monospace"; g.textAlign = "center"; g.lineWidth = 6; g.strokeStyle = "#0d2a14"; const y = FLOOR_Y + 30; g.strokeText(txt, VIEW.sx(cx), y); g.fillStyle = "#ffe14d"; g.fillText(txt, VIEW.sx(cx), y);
+            g.font = "11px P2, monospace"; g.strokeText("3 ATP PER TURN", VIEW.sx(cx), y + 20); g.fillStyle = "#ffffff"; g.fillText("3 ATP PER TURN", VIEW.sx(cx), y + 20); g.restore(); }
         },
       };
     },

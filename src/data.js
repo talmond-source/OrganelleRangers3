@@ -26,7 +26,7 @@ const MOVES = {
       { dir: "fwd", name: "Power Stroke", desc: "Lunging punch that crosses half the screen.", bio: "Myosin spends one ATP per pull on actin. Millions of these power strokes make a muscle contract." },
       { dir: "down", name: "Overdrive", desc: "Close-range zap that paralyzes the opponent briefly.", bio: "ATP's energy drives ion pumps and nerve signals; a sudden surge is a jolt." },
     ],
-    ult: { name: "ATP Synthase Turbine", bio: "ATP synthase is a real rotary motor. Protons rushing through spin its rotor about 100 times a second, and each turn builds 3 ATP." },
+    ult: { name: "Turbine Trap", bio: "ATP synthase is a real rotary motor. Normally protons flowing back through it spin its rotor, and every turn builds 3 ATP from ADP + phosphate. In the Turbine Trap, the opponent replaces the proton flow." },
   },
   ribosome: {
     fact: "Ribosomes build proteins. They read mRNA three letters (one codon) at a time and link the matching amino acids into a chain.",

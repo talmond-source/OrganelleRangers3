@@ -1542,6 +1542,109 @@ const DOMAINS = {
       };
     },
   },
+
+  /* ---------- Smooth ER: Calcium Cramp. A nerve signal opens the calcium channels; calcium floods out and every muscle locks: tetany ---------- */
+  smoother: {
+    name: "CALCIUM CRAMP", col: "#19c9b5", gold: "#ffd23f", mote: "#ffe28a", dur: 7.3, shatter: 6.5, pull: 6.25, dim: 0.1,
+    glow: null,
+    mv: { knock: [3, 6] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { zap: 1.45, open: 1.7, contract: 2.35, tetany: 3.75, cramps: [4.0, 4.3, 4.6], snap: 5.15, pump: 5.25, loose: 5.5, down: 5.85 };
+      const PR = M.props, rnd = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+      const [bx, top] = defBox(def, "hitBody"), cx = def.x + bx, cap = () => (FLOOR_Y - 130) / VIEW.S;
+      const chans = () => [[cx - s * 1.35, 2.0], [cx, Math.min(cap(), top + 0.75)], [cx + s * 1.35, 2.0]];
+      const calcium = (t) => (t < T.open ? 0.05 : t < T.pump ? 0.05 + 0.95 * easeOut(seg(t, T.open, T.open + 0.6)) : 1 - 0.95 * easeIn(seg(t, T.pump, T.loose + 0.2)));
+      const squeeze = (t) => { // how tightly the opponent is cramped (0 = relaxed, 1 = balled up), in steps for each cramp
+        if (t < T.contract) return 0; let k = 0.35 * ss(t, T.contract, T.contract + 0.5); T.cramps.forEach((tc, i) => { k += 0.2 * easeOut(seg(t, tc, tc + 0.12)); }); k = Math.min(0.95, k);
+        return t < T.snap ? k : k * (1 - easeOut(seg(t, T.snap + 0.05, T.loose))); };
+      const NI = 30, ions = Array.from({ length: NI }, (_, i) => ({ ch: i % 3, t0: T.open + (i / NI) * 0.9, a: (rnd(i, 1) - 0.5) * 1.4, r: 0.35 + rnd(i, 2) * 0.55, spin: rnd(i, 3) * TAU }));
+      const ionPos = (io, t) => { const [x0, y0] = chans()[io.ch], u = seg(t, io.t0, io.t0 + 0.45), back = seg(t, T.pump, T.loose); // out of the channel, swarm round the opponent, then pumped back
+        const sw = [cx + Math.cos(io.spin + t * 2) * io.r, top * 0.5 * (1 - 0.45 * squeeze(t)) + Math.sin(io.spin + t * 2.3) * io.r * 0.8]; const out = [lerp(x0, sw[0], easeOut(u)), lerp(y0, sw[1], easeOut(u))];
+        return back > 0 ? [lerp(out[0], x0, easeIn(back)), lerp(out[1], y0, easeIn(back)), 1 - seg(back, 0.85, 1)] : [out[0], out[1], Math.min(1, u * 4)]; };
+      const ion = (g, x, y, a, lbl) => { g.save(); g.globalAlpha *= a; g.globalCompositeOperation = "lighter"; g.fillStyle = "rgba(255,210,63,.35)"; g.beginPath(); g.arc(x, y, 12, 0, TAU); g.fill(); g.globalCompositeOperation = "source-over"; g.fillStyle = "#ffd23f"; g.strokeStyle = "#3a2600"; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, TAU); g.fill(); g.stroke();
+        if (lbl) { g.font = "11px P2, monospace"; g.textAlign = "center"; g.lineWidth = 4; g.strokeStyle = "#140a24"; g.strokeText("Ca2+", x, y - 12); g.fillStyle = "#fff3b0"; g.fillText("Ca2+", x, y - 12); } g.restore(); };
+      const nerves = () => DOMAIN_META.smoother.bg.nerves.map(([ix, iy]) => domBgPt("smoother", ix, iy));
+      const bolt = (g, a, b, seed, w) => { g.beginPath(); g.moveTo(a[0], a[1]); for (let k = 1; k < 7; k++) { const u = k / 7; g.lineTo(lerp(a[0], b[0], u) + (rnd(seed, k) - 0.5) * 40, lerp(a[1], b[1], u) + (rnd(seed, k + 9) - 0.5) * 20); } g.lineTo(b[0], b[1]); g.lineWidth = w; g.stroke(); };
+      const panel = (g, t) => { // the sliding filaments: calcium lets myosin heads grab actin and pull, so the Z-lines move together
+        const a = ss(t, T.contract - 0.1, T.contract + 0.15) * (1 - ss(t, T.tetany + 0.6, T.tetany + 0.85)); if (a <= 0) return;
+        const W = 330, H = 170, x0 = s > 0 ? 40 : VIEW_W - W - 40, y0 = 96, mx = x0 + W / 2, my = y0 + 78, k = ss(t, T.contract + 0.15, T.tetany), half = lerp(135, 92, k), beat = Math.floor(t / 0.14) % 2;
+        g.save(); g.globalAlpha *= a; g.fillStyle = "rgba(14,6,22,.88)"; g.strokeStyle = "#ffffff"; g.lineWidth = 3; g.beginPath(); g.roundRect(x0, y0, W, H, 12); g.fill(); g.stroke();
+        g.save(); g.beginPath(); g.rect(x0 + 4, y0 + 4, W - 8, H - 8); g.clip();
+        for (const zx of [mx - half, mx + half]) { g.strokeStyle = "#ffffff"; g.lineWidth = 4; g.beginPath(); g.moveTo(zx, my - 52); g.lineTo(zx, my + 52); g.stroke(); }
+        for (const row of [-34, 0, 34]) for (const [zx, dir] of [[mx - half, 1], [mx + half, -1]]) for (let b = 0; b < 9; b++) { // actin: two twisted bead chains
+          const bxx = zx + dir * (6 + b * 10); g.fillStyle = "#ff5a6a"; g.beginPath(); g.arc(bxx, my + row + Math.sin(b * 1.2) * 2.5, 4.2, 0, TAU); g.fill(); g.fillStyle = "#ff9aa5"; g.beginPath(); g.arc(bxx + 5, my + row - Math.sin(b * 1.2) * 2.5, 4.2, 0, TAU); g.fill(); }
+        for (const row of [-17, 17]) { g.strokeStyle = "#8a5cff"; g.lineWidth = 7; g.beginPath(); g.moveTo(mx - 62, my + row); g.lineTo(mx + 62, my + row); g.stroke(); // myosin: a thick filament with heads that grab and pull
+          for (let h = 0; h < 6; h++) { const side = h < 3 ? -1 : 1, hx = mx + side * (22 + (h % 3) * 14), up = (h % 2 ? 1 : -1), tilt = (beat ^ (h % 2)) ? 0.25 : -0.45, ang = side * (Math.PI / 2 + tilt) * -1;
+            const ex = hx + Math.cos(-Math.PI / 2 * up + side * tilt) * 0 + side * 7 * (beat ? 1 : 0.4), ey = my + row + up * 13; g.strokeStyle = "#c9a8ff"; g.lineWidth = 3; g.beginPath(); g.moveTo(hx, my + row); g.lineTo(ex, ey); g.stroke(); g.fillStyle = "#c9a8ff"; g.beginPath(); g.ellipse(ex, ey, 4.5, 3, ang, 0, TAU); g.fill(); } }
+        g.restore();
+        const lab = (txt, x, y, col) => { g.font = "10px P2, monospace"; g.textAlign = "center"; g.fillStyle = col; g.fillText(txt, x, y); };
+        lab("Z", mx - half, y0 + 18, "#ffffff"); lab("Z", mx + half, y0 + 18, "#ffffff"); lab("ACTIN", mx - half + 45, y0 + H - 10, "#ff8a95"); lab("MYOSIN", mx, y0 + H - 22, "#c9a8ff"); lab("ACTIN", mx + half - 45, y0 + H - 10, "#ff8a95");
+        g.font = "12px P2, monospace"; g.textAlign = "center"; g.fillStyle = "#ffd23f"; g.fillText("Ca2+ ON: HEADS PULL", mx, y0 + H + 18 > VIEW_H ? y0 + H - 4 : y0 + 32 - 0); g.restore();
+      };
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.contract - 0.08, 2], [T.snap - 0.05, 3]],
+        camera(t) {
+          if (t < T.snap) { const k = ss(t, D.expand, D.expand + 0.6); return { x: lerp(att.x + s * 0.25, mid + s * 0.4, k), S: lerp(150, 98, k) + 8 * ss(t, T.tetany, T.cramps[2] + 0.2) + 2 * squeeze(t) * Math.sin(t * 50) * (t > T.tetany ? 1 : 0) }; }
+          const k = ss(t, T.snap, T.snap + 0.4); return { x: lerp(mid + s * 0.4, mid, k), S: lerp(106, 98, k) };
+        },
+        step(t) {
+          if (c.once("zap", T.zap)) { game.sfx("zap"); game.sfx("charge"); VIEW.flash = 0.05; }
+          if (c.once("open", T.open)) { game.sfx("whoosh"); game.sfx("splash"); VIEW.shake = 0.3; }
+          if (c.once("contract", T.contract)) { game.sfx("creak"); def.flash = 0.1; }
+          if (t > T.contract && t < T.tetany && Math.floor(t / 0.14) !== Math.floor((t - 1 / 60) / 0.14)) game.sfx("block");
+          if (c.once("tetany", T.tetany)) { game.sfx("heavy"); VIEW.shake = 0.4; }
+          T.cramps.forEach((tc, i) => { if (c.once("cr" + i, tc)) { c.freeze = 0.06; VIEW.shake = 0.4 + 0.15 * i; game.sfx("crunch"); def.flash = 0.12; if (i === 2) { VIEW.impact = 0.14; FX2D.cx = VIEW.sx(cx) / VIEW_W; FX2D.cy = VIEW.sy(top * 0.5) / VIEW_H; game.sfx("impact"); } } });
+          if (c.once("snap", T.snap)) game.sfx("ding");
+          if (c.once("pump", T.pump)) game.sfx("whoosh");
+          if (c.once("loose", T.loose)) { game.sfx("boing"); }
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(def.x, 8); }
+        },
+        drawBack(g, t) { // nerve signals strike from the background's nerve endings down to the channels
+          if (t < T.zap - 0.05 || t > T.open + 0.3) return; const a = 1 - seg(t, T.open, T.open + 0.3), ch = chans(), ns = nerves();
+          g.save(); g.globalAlpha *= a; g.globalCompositeOperation = "lighter"; g.lineJoin = "round";
+          ns.forEach((n, i) => { const tg = [VIEW.sx(ch[i][0]), VIEW.sy(ch[i][1])], k = ss(t, T.zap, T.zap + 0.2), e = [lerp(n[0], tg[0], k), lerp(n[1], tg[1], k)], seed = i * 7 + Math.floor(t * 20);
+            g.strokeStyle = "rgba(200,120,255,.6)"; bolt(g, n, e, seed, 9); g.strokeStyle = "#ffffff"; bolt(g, n, e, seed, 3); });
+          g.restore();
+        },
+        drawDef(g, t) {
+          if (t < T.contract) return X.drawDefIdle(g, t);
+          if (t < T.loose) { const k = squeeze(t), tr = t > T.tetany && t < T.snap ? (rnd(Math.floor(t * 30), 1) - 0.5) * 0.015 : 0; // a rigid, trembling lock-up, not a convulsion
+            return defMorph(g, def, t > T.tetany ? "hitBody" : "hitHigh", def.x + tr, 0, { kx: 1 - 0.35 * k, ky: 1 - 0.55 * k, cy: 0.05, flash: def.flash, rot: k * 0.12 * def.face }); }
+          if (t < T.down) { const u = seg(t, T.loose, T.down), sp = spring(u, 6, 18); return defMorph(g, def, "dizzy", def.x, 0, { kx: 1 + 0.25 * sp, ky: 1 - 0.25 * sp, cy: 0.05, rot: Math.sin(u * 9) * 0.1 * (1 - u) }); }
+          const u = t - T.down; defPose(g, def, "down", def.x, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.2 * spring(u, 8, 20)) });
+        },
+        drawProps(g, t) {
+          const ch = chans(), f = PR.frames[0], px = VIEW.S * 0.75 / f[2];
+          if (t >= T.zap && t < T.loose + 0.3) ch.forEach(([x, y], i) => { // channels open; after the snap, pumps pull the calcium back
+            const a = Math.min(1, (t - T.zap) / 0.2) * (1 - seg(t, T.loose, T.loose + 0.3)), pump = t >= T.pump, open = t >= T.open && !pump, pop = backOut(seg(t, T.zap + i * 0.05, T.zap + i * 0.05 + 0.25)) * (open && t < T.open + 0.3 ? 1 + 0.15 * spring(t - T.open, 10, 30) : 1);
+            domCentered(g, IM.props, PR, pump ? 2 : open ? 1 : 0, VIEW.sx(x), VIEW.sy(y), px * pop, { alpha: a, kx: pump ? -Math.sign(x - cx || 1) * (s > 0 ? 1 : 1) : 1 }); });
+          if (t >= T.open && t < T.loose + 0.1) ions.forEach((io, i) => { if (t < io.t0) return; const [x, y, a] = ionPos(io, t); ion(g, VIEW.sx(x), VIEW.sy(y), a, i % 5 === 0); });
+          panel(g, t);
+          if (t > T.tetany && t < T.snap) { // cramp lines round the locked-up opponent
+            const k = squeeze(t); g.save(); g.strokeStyle = "#ffd23f"; g.lineWidth = 4; for (let i = 0; i < 8; i++) { const an = i / 8 * TAU + 0.2, r1 = (0.95 - 0.2 * k) * VIEW.S, r2 = r1 + 18 + 6 * Math.sin(t * 40 + i); const ox = VIEW.sx(cx), oy = VIEW.sy(top * 0.5 * (1 - 0.5 * k)); g.beginPath(); g.moveTo(ox + Math.cos(an) * r1, oy + Math.sin(an) * r1 * 0.9); g.lineTo(ox + Math.cos(an) * r2, oy + Math.sin(an) * r2 * 0.9); g.stroke(); } g.restore(); }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          const hx = VIEW.sx(cx), hy = Math.max(110, VIEW.sy(top + 0.6));
+          pop("SIGNAL!", T.zap, hx, hy, 50, "#d9a8ff", -0.06, 0.4);
+          pop("Ca2+ FLOOD!", T.open + 0.05, hx, hy, 50, "#ffd23f", 0.05, 0.5);
+          pop("CONTRACT!", T.contract, hx, hy, 52, "#ff6a7a", -0.05, 0.5);
+          pop("TETANY!", T.tetany, hx, hy, 62, "#ffd23f", 0.05, 0.6);
+          T.cramps.forEach((tc, i) => pop("CRAMP!", tc, hx + (i % 2 ? 1 : -1) * 150, hy + 40, 40 + i * 6, "#ffffff", i % 2 ? 0.1 : -0.1, 0.3));
+          pop("*SNAP*", T.snap, VIEW.sx(att.x + s * 0.5), Math.max(110, VIEW.sy(2.7)), 44, "#ffffff", -0.05, 0.4);
+          pop("RELEASED!", T.loose, hx, hy, 54, "#19c9b5", 0.05, 0.5);
+          if (t > T.zap && t < T.loose + 0.4) { // the calcium meter
+            const v = calcium(t), a = Math.min(1, (t - T.zap) / 0.2) * (1 - seg(t, T.loose + 0.1, T.loose + 0.4)), W = 190, Hh = 66, x0 = s > 0 ? VIEW_W - W - 40 : 40, y0 = 100;
+            g.save(); g.globalAlpha *= a; g.fillStyle = "rgba(14,6,22,.85)"; g.strokeStyle = "#ffffff"; g.lineWidth = 3; g.beginPath(); g.roundRect(x0, y0, W, Hh, 10); g.fill(); g.stroke();
+            g.font = "13px P2, monospace"; g.textAlign = "center"; g.fillStyle = "#ffffff"; g.fillText("CYTOSOL Ca2+", x0 + W / 2, y0 + 22);
+            g.fillStyle = "#333"; g.fillRect(x0 + 14, y0 + 32, W - 28, 14); g.fillStyle = v > 0.6 ? "#ffd23f" : "#19c9b5"; g.fillRect(x0 + 14, y0 + 32, (W - 28) * v, 14);
+            g.font = "10px P2, monospace"; g.fillStyle = v > 0.6 ? "#ffd23f" : "#9ff5e8"; g.fillText(t < T.open ? "RESTING" : t < T.pump ? "FLOODED!" : "PUMPED BACK", x0 + W / 2, y0 + 60); g.restore();
+          }
+        },
+      };
+    },
+  },
 };
 
 function domainCine(game, att, def) {

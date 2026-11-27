@@ -348,6 +348,20 @@ def membrane(meta):
     meta['membrane'] = m
 
 
+def smoother(meta):
+    """Calcium Cramp (smoother): bg.png inside a muscle fibre (striations, smooth sarcoplasmic reticulum with calcium,
+    nerve endings); poses.png hand sign (flex), expansion, squeeze, snap release; props.png 2 x 2: calcium channel shut,
+    channel open, calcium pump, a contracted muscle segment. Ca2+ ions, the meter and the sliding filaments are code."""
+    src, dst = os.path.join(SRC, 'smoother'), os.path.join(DST, 'smoother'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 740, 'nerves': [[340, 228], [836, 222], [1330, 228]], 'sacs': [[230, 285], [175, 500], [250, 680], [1420, 285], [1500, 500], [1420, 680]]}
+    m['poses'] = ranger_poses(src, dst)
+    cc = [clean_white(c, keep_all=(i in (1, 3))) for i, c in enumerate(cells(os.path.join(src, 'props.png'), 2, 2))]
+    b0 = bbox(cc[0]); sheet, info = strip(cc, 200 / (b0[2] - b0[0] + 1)); sheet.save(os.path.join(dst, 'props.png'), optimize=True); m['props'] = info
+    meta['smoother'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -364,6 +378,7 @@ def main():
     lysosome(meta)
     atp(meta)
     membrane(meta)
+    smoother(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

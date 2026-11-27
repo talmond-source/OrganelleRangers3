@@ -44,6 +44,11 @@ function domBackground(g, id, t) {
   }
 }
 
+/* where a point of the domain's background image (image pixels) lands on screen, matching domBackground */
+function domBgPt(id, ix, iy) {
+  const B = DOMAIN_META[id].bg, s = Math.max(0.6 * Math.pow(VIEW.S / 98, 0.3), (FLOOR_Y + 4) / B.floor, (VIEW_W + 40) / B.size[0]), w = B.size[0] * s;
+  const x = clamp(VIEW_W / 2 - w / 2 - VIEW.camX * VIEW.S * 0.12, VIEW_W - w + 20, -20), y = FLOOR_Y - B.floor * s; return [x + ix * s, y + iy * s];
+}
 /* the opponent in one of its fight poses (the extra sheet: hitHigh, hitBody, block, down, dizzy...), with a fallback for the Phage */
 const K1 = () => FIGHTER_H / SPRITE_META.target;
 function defPose(g, def, key, x, y, o = {}) {
@@ -847,6 +852,119 @@ const DOMAINS = {
             lab("LEADING STRAND", pa[0], pa[1] + 0.55, "#ffd36b", a); lab("LAGGING: OKAZAKI FRAGMENTS", pb[0], pb[1] - 0.55, "#ffd36b", a); }
           if (t > T.copies && t < T.strike + 0.3) { const a = Math.min(1, (t - T.copies) / 0.2) * (1 - seg(t, T.strike, T.strike + 0.3)), pa = curve(0, t)(0.45), pb = curve(1, t)(0.45);
             lab("1 OLD + 1 NEW", pa[0], pa[1] + 0.55, "#ffffff", a); lab("1 OLD + 1 NEW", pb[0], pb[1] - 0.5, "#ffffff", a); }
+        },
+      };
+    },
+  },
+
+  /* ---------- Mitosis: Cellular Craze. The opponent goes through the phases of mitosis, then divides out of control into chibi copies ---------- */
+  mitosis: {
+    name: "CELLULAR CRAZE", col: "#ff3fa4", gold: "#5dff7a", mote: "#ffb3dc", dur: 7.6, shatter: 6.8, pull: 6.55, dim: 0.06,
+    glow: null,
+    mv: { knock: [3, 6] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { pro: 1.55, meta: 2.15, ana: 2.8, cyto: 3.35, pop: 3.7, dbl: [4.0, 4.25, 4.5], pile: 4.75, dash: 5.25, chop: 5.45, merge: 5.75, down: 6.05 };
+      const lim = (x) => clamp(x, -HALF + 0.35, HALF - 0.35), startX = att.x, chopX = def.x - s * 1.25;
+      const PR = M.props, xpx = () => VIEW.S * 0.62 / PR.frames[0][3];
+      // four chromosomes: two from each parent (pink and green), each an X of two identical sister chromatids
+      const chrom = [0, 1, 0, 1], spot = [[-0.75, 2.05], [0.8, 1.75], [-0.55, 0.95], [0.7, 0.55]], plate = [2.15, 1.6, 1.05, 0.5];
+      const chromPos = (i, t) => { const k = ss(t, T.meta, T.meta + 0.4); return [def.x + lerp(spot[i][0], 0, k), lerp(spot[i][1], plate[i], k)]; };
+      const sep = (t) => 0.95 * easeIn(seg(t, T.ana, T.ana + 0.45)); // anaphase: sisters pulled to opposite poles
+      const poles = () => DOMAIN_META.mitosis.bg.poles.map(([ix, iy]) => domBgPt("mitosis", ix, iy));
+      // the copies: each round doubles the count and halves the size
+      const count = (t) => (t < T.pop ? 1 : t < T.dbl[0] ? 2 : t < T.dbl[1] ? 4 : t < T.dbl[2] ? 8 : 16);
+      const scale = (n) => ({ 1: 1, 2: 0.76, 4: 0.6, 8: 0.47, 16: 0.38 })[n];
+      const rnd = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+      const homeX = (i, n) => def.x + (n === 1 ? 0 : (((i + 0.5) / n) - 0.5) * Math.min(4.4, 1.1 * Math.sqrt(n) * 1.3));
+      const pileSpot = (i) => { const row = i < 6 ? 0 : i < 10 ? 1 : i < 13 ? 2 : i < 15 ? 3 : 4, idx = [0, 6, 10, 13, 15][row], nIn = [6, 4, 3, 2, 1][row]; return [def.x + (i - idx - (nIn - 1) / 2) * 0.48 + s * 0.15, row * 0.34]; };
+      const copyAt = (i, t) => { // where copy i is and how it's tumbling
+        const n = count(t); if (i >= n) return null;
+        const born = n === 2 ? T.pop : T.dbl[Math.log2(n) - 2], from = homeX(i >> 1, n / 2), to = homeX(i, n), k = easeOut(seg(t, born, born + 0.18));
+        let x = lerp(from, to, k), y = Math.abs(Math.sin((t - born) * (7 + rnd(i, 1) * 5) + rnd(i, 2) * 6)) * (0.25 + 0.35 * rnd(i, 3)), rot = Math.sin(t * 6 + i) * 0.25;
+        if (t >= T.pile) { const u = easeOut(seg(t, T.pile, T.pile + 0.35)), [px, py] = pileSpot(i); x = lerp(x, px, u); y = lerp(y, py, u) + (t < T.chop ? Math.abs(Math.sin(t * 9 + i)) * 0.04 : 0); rot = lerp(rot, (rnd(i, 4) - 0.5) * 2.2, u); }
+        if (t >= T.chop) { const u = easeIn(seg(t, T.chop + 0.05, T.merge)); x = lerp(x, def.x, u); y = lerp(y, 0.4, u); rot *= 1 - u; }
+        return [x, y, rot, scale(n)];
+      };
+      const drawX = (g, kind, x, y, half, dx = 0, a = 1) => { // one chromosome, or one of its sister chromatids (half = -1 / +1)
+        const fr = PR.frames[kind], px = xpx(), cx = VIEW.sx(x), cy = VIEW.sy(y);
+        g.save(); g.globalAlpha = a; if (half) { g.beginPath(); const W = fr[2] * px; g.rect(cx + (half < 0 ? -W : 0) + dx * VIEW.S, cy - 400, W, 800); g.clip(); g.translate(dx * VIEW.S, 0); }
+        domCentered(g, IM.props, PR, kind, cx, cy, px); g.restore();
+      };
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.ana - 0.08, 2], [T.pop + 0.2, 1], [T.dash, 3]],
+        attX: (t) => (t < T.dash ? startX : lerp(startX, lim(chopX), easeOut(seg(t, T.dash, T.chop)))),
+        ghosts: (t) => t > T.dash && t < T.chop + 0.05,
+        camera(t) {
+          if (t < T.pop) { const k = ss(t, D.expand, D.expand + 0.7); return { x: lerp(att.x + s * 0.25, def.x - s * 1.3, k), S: lerp(150, 112, k) }; }
+          if (t < T.chop) { const k = ss(t, T.pop, T.dbl[2] + 0.2); return { x: lerp(def.x - s * 1.3, def.x - s * 0.9, k), S: lerp(112, 84, k) }; }
+          const k = ss(t, T.chop, T.chop + 0.3); return { x: lerp(def.x - s * 0.9, def.x - s * 0.6, k), S: lerp(84, 112, k) + 9 * spring(t - T.chop, 6, 18) };
+        },
+        step(t) {
+          if (c.once("pro", T.pro)) game.sfx("charge");
+          if (c.once("meta", T.meta)) game.sfx("zap");
+          if (c.once("ana", T.ana)) { game.sfx("whoosh"); VIEW.shake = 0.25; }
+          if (c.once("cyto", T.cyto)) game.sfx("creak");
+          if (c.once("pop", T.pop)) { game.sfx("pop"); VIEW.shake = 0.35; VIEW.flash = 0.05; X.grit(def.x, 6); }
+          T.dbl.forEach((td, i) => { if (c.once("d" + i, td)) { game.sfx("pop"); VIEW.shake = 0.2 + i * 0.1; } });
+          if (t > T.dbl[2] && t < T.pile && Math.random() < 0.18) game.sfx("boing");
+          if (c.once("pile", T.pile)) game.sfx("land");
+          for (let j = 0; j < 4; j++) if (c.once("bk" + j, T.pile + 0.1 + j * 0.1)) game.sfx("bonk");
+          if (c.once("dash", T.dash)) game.sfx("jump");
+          if (c.once("chop", T.chop)) { c.freeze = 0.12; VIEW.impact = 0.16; VIEW.shake = 0.9; FX2D.cx = VIEW.sx(def.x) / VIEW_W; FX2D.cy = VIEW.sy(0.8) / VIEW_H; game.sfx("impact"); game.sfx("boom"); for (let q = 0; q < 22; q++) { const a = Math.random() * TAU, v = 4 + Math.random() * 7; P.spark(V3(def.x, 0.8, 0), q % 2 ? "#ff3fa4" : "#5dff7a", 0.13, V3(Math.cos(a) * v, Math.sin(a) * v, 0), 0.45); } }
+          if (c.once("merge", T.merge)) { game.sfx("poof"); def.flash = 0.2; }
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(def.x, 8); }
+        },
+        drawDef(g, t) {
+          if (t < T.ana) return X.drawDefIdle(g, t);
+          if (t < T.pop) { // the cell stretches as the poles move apart, then pinches in the middle
+            const st = ss(t, T.ana, T.ana + 0.45), pinch = ss(t, T.cyto, T.pop);
+            defMorph(g, def, "hitBody", def.x, 0, { kx: 1 + 0.35 * st + 0.2 * pinch, ky: 1 - 0.08 * st - 0.1 * pinch, cy: 0.9, flash: def.flash }); return;
+          }
+          if (t < T.merge) { // the copies
+            for (let i = 0; i < 16; i++) { const p = copyAt(i, t); if (!p) continue; const [x, y, rot, sc] = p, key = t >= T.pile ? (i % 3 ? "dizzy" : "hitBody") : i % 2 ? "idle" : "hitHigh";
+              const pop = 1 + 0.2 * spring(t - (count(t) === 2 ? T.pop : T.dbl[Math.max(0, Math.log2(count(t)) - 2)]), 10, 30);
+              defPose(g, def, key, x, y, { scale: sc * pop, rot, pivot: 0.5 * sc, flash: t > T.chop && t < T.chop + 0.1 ? 0.15 : 0 }); }
+            return;
+          }
+          if (t < T.down) { const u = seg(t, T.merge, T.down); return defPose(g, def, "dizzy", def.x, 0, { squash: 1 + 0.1 * spring(u, 8, 26), flash: def.flash }); }
+          const u = t - T.down; defPose(g, def, "down", def.x, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.15 * spring(u, 8, 20)) });
+        },
+        drawProps(g, t) {
+          if (t >= T.pro && t < T.cyto + 0.2) {
+            const a = Math.min(1, (t - T.pro) / 0.3) * (1 - seg(t, T.cyto, T.cyto + 0.2));
+            if (t >= T.meta - 0.05 && t < T.cyto) { // spindle fibres from both poles to every centromere (or to each chromatid once they separate)
+              const [L, R] = poles(), k = seg(t, T.meta - 0.05, T.meta + 0.25);
+              g.save(); g.globalAlpha = a; g.globalCompositeOperation = "lighter"; g.strokeStyle = "rgba(120,255,160,.8)"; g.lineWidth = 2;
+              for (let i = 0; i < 4; i++) { const [x, y] = chromPos(i, t), d = sep(t); for (const [pt, sd] of [[L, -1], [R, 1]]) { const ex = VIEW.sx(x + sd * s * d * 0 + sd * d), ey = VIEW.sy(y), tx = lerp(pt[0], ex, k), ty = lerp(pt[1], ey, k); g.beginPath(); g.moveTo(pt[0], pt[1]); g.lineTo(tx, ty); g.stroke(); } }
+              g.restore();
+            }
+            for (let i = 0; i < 4; i++) {
+              const [x, y] = chromPos(i, t), born = T.pro + i * 0.08, k = backOut(seg(t, born, born + 0.3));
+              if (t < T.ana) { if (k <= 0) continue; g.save(); g.globalAlpha = a; const cx = VIEW.sx(x), cy = VIEW.sy(y); g.translate(cx, cy); g.scale(k, k); g.translate(-cx, -cy); drawX(g, chrom[i], x, y, 0); g.restore(); }
+              else { const d = sep(t); drawX(g, chrom[i], x, y, -1, -d, a); drawX(g, chrom[i], x, y, 1, d, a); }
+            }
+          }
+          if (t >= T.cyto && t < T.pop + 0.1) { // the contractile ring tightens round the middle
+            const k = seg(t, T.cyto, T.pop), cx = VIEW.sx(def.x), cy = VIEW.sy(1.0), rx = (0.75 - 0.6 * easeIn(k)) * VIEW.S;
+            g.save(); g.globalCompositeOperation = "lighter"; g.strokeStyle = "#ff7ac4"; g.lineWidth = 6; g.beginPath(); g.ellipse(cx, cy, Math.max(2, rx), rx * 0.22 + 3, 0, 0, TAU); g.stroke(); g.strokeStyle = "#ffffff"; g.lineWidth = 2; g.stroke(); g.restore();
+          }
+          if (t >= T.pop && t < T.dbl[2] + 0.3) for (const td of [T.pop, ...T.dbl]) { if (t < td || t > td + 0.3) continue; const u = seg(t, td, td + 0.3); g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = 1 - u; g.strokeStyle = "#ffb3dc"; g.lineWidth = 5; g.beginPath(); g.arc(VIEW.sx(def.x), VIEW.sy(0.9), (0.4 + 2.2 * u) * VIEW.S, 0, TAU); g.stroke(); g.restore(); }
+          if (t > T.pile + 0.1 && t < T.chop) for (let j = 0; j < 4; j++) { const t0 = T.pile + 0.1 + j * 0.1; if (t < t0) continue; const p = pileSpot((j * 5 + 3) % 16), u = (t - t0) * 6; // bonked-head stars over the pile
+            for (let q = 0; q < 3; q++) { const a = u + q * TAU / 3, x = VIEW.sx(p[0]) + Math.cos(a) * 18, y = VIEW.sy(p[1] + 0.75) + Math.sin(a) * 5; g.save(); g.fillStyle = "#ffe14d"; g.strokeStyle = "#1a0b2e"; g.lineWidth = 1.5; g.translate(x, y); g.beginPath(); for (let k = 0; k < 10; k++) { const rr = k % 2 ? 3 : 7, b = k * TAU / 10 - Math.PI / 2; g.lineTo(Math.cos(b) * rr, Math.sin(b) * rr); } g.closePath(); g.fill(); g.stroke(); g.restore(); } }
+          if (t >= T.chop && t < T.chop + 0.3) { const u = seg(t, T.chop, T.chop + 0.3), x = VIEW.sx(def.x); g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = 1 - u; g.strokeStyle = "#ffffff"; g.lineWidth = 12 * (1 - u) + 2; g.beginPath(); g.moveTo(x - s * 30, VIEW.sy(3.2)); g.lineTo(x + s * 30, FLOOR_Y); g.stroke(); g.restore(); }
+          if (t >= T.merge - 0.05 && t < T.merge + 0.5) { const u = seg(t, T.merge - 0.05, T.merge + 0.5); domStrip(g, DOMAIN_IMG.rna ? DOMAIN_IMG.rna.smoke : IM.props, DOMAIN_IMG.rna ? DOMAIN_META.rna.smoke : PR, DOMAIN_IMG.rna ? 1 : 3, VIEW.sx(def.x), VIEW.sy(-0.2), VIEW.S * 2.6 / (DOMAIN_IMG.rna ? DOMAIN_META.rna.smoke.frames[1][2] : 200) * (0.8 + 0.4 * u), { alpha: 0.8 * (1 - u * u) }); }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          const lx = VIEW.sx(def.x + s * 1.9);
+          pop("PROPHASE", T.pro + 0.05, lx, VIEW.sy(2.6), 40, "#ffb3dc", -0.06, 0.55);
+          pop("METAPHASE", T.meta + 0.1, lx, VIEW.sy(2.6), 40, "#5dff7a", 0.06, 0.55);
+          pop("ANAPHASE", T.ana + 0.05, lx, VIEW.sy(2.6), 40, "#ffb3dc", -0.06, 0.5);
+          pop("CYTOKINESIS!", T.pop, VIEW.sx(def.x), VIEW.sy(2.6), 48, "#ffffff", 0.05, 0.4);
+          [T.pop, ...T.dbl].forEach((td, i) => pop("×" + (2 << i), td + 0.02, VIEW.sx(def.x) + (i % 2 ? 1 : -1) * 120, VIEW.sy(2.1 + i * 0.25), 44 + i * 8, i === 3 ? "#ff3fa4" : "#5dff7a", i % 2 ? 0.1 : -0.1, 0.3));
+          pop("CELLULAR CRAZE!", T.pile + 0.05, VIEW.sx(def.x), VIEW.sy(2.9), 58, "#ff3fa4", -0.05, 0.6);
+          pop("CHOP!", T.chop, VIEW.sx(def.x + s * 1.1), VIEW.sy(2.3), 64, "#ffffff", 0.1, 0.5);
         },
       };
     },

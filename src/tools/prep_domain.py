@@ -42,13 +42,20 @@ Silent Shadow Interference (rna):
 mtDNA Disk Barrage (mito):
   bg.png      inside a mitochondrion: cristae with ATP synthase facing the matrix, a grid floor (the matrix)
   poses.png   2 x 2 Mitochondria Ranger poses on a GREEN screen (the suit is white): hand sign, expansion, throw
-              wind-up, throw release. Cut with clean_green. The mtDNA disks are drawn in code
+              wind-up, throw release. Cut with clean_key (green). The mtDNA disks are drawn in code
 
 Twin Serpent Fork (dna):
   bg.png      a temple courtyard in the nucleus (nucleosome lanterns, right-handed helix pillars)
   poses.png   2 x 2 DNA Ranger poses: hand sign (palms together), expansion, unzip, twin strike
   props.png   2 x 2: serpent head closed, head open, helicase (6-lobed ring), DNA polymerase (hand-shaped)
               -> heads.png + enzymes.png. The serpents' bodies are double helices drawn in code
+
+Cellular Craze (mitosis):
+  bg.png      a dividing cell: two centrosomes with asters, spindle fibres, fragments of nuclear envelope
+  poses.png   2 x 2 Mitosis Ranger poses on a BLUE screen (silver suit with magenta and green): hand sign
+              (knuckles together), expansion, pull apart, karate chop. Cut with clean_key (blue)
+  props.png   2 x 2: pink X chromosome, green X chromosome, one chromatid, a centrosome (two centrioles at right
+              angles). In anaphase the game splits each X down the middle into its two sister chromatids
 """
 import os, sys, json
 import numpy as np
@@ -122,30 +129,31 @@ def nucleus(meta):
     meta['nucleus'] = m
 
 
-def clean_green(rgba):
-    """Cutout for sheets drawn on a flat bright green screen (for white characters): removes the green, the
-    green-tinted rim pixels, and green spill on the edge; keeps the biggest piece."""
+def clean_key(rgba, ch=1):
+    """Cutout for sheets drawn on a flat screen colour (channel ch: 1 = green, 2 = blue), for characters whose own
+    colours would be lost on white. Removes the screen, peels screen-tinted rim pixels and takes the spill out of the
+    edge band only, so the character's own green or teal parts are untouched; keeps the biggest piece."""
     from scipy import ndimage
-    rgb = rgba[..., :3].astype(int); r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
-    key = (g > 150) & (g - np.maximum(r, b) > 60)
-    m = ~key
-    for _ in range(3):  # peel greenish rim pixels
+    rgb = rgba[..., :3].astype(int); k = rgb[..., ch]; others = np.delete(rgb, ch, axis=2).max(-1); excess = k - others
+    m = ~((k > 150) & (excess > 100))
+    for _ in range(3):  # peel rim pixels that are mostly screen colour
         edge = m & ~ndimage.binary_erosion(m)
-        peel = edge & (g - np.maximum(r, b) > 18)
+        peel = edge & (excess > 70) & (others < 120)
         if not peel.any(): break
         m &= ~peel
     m = ndimage.binary_opening(m, structure=np.ones((2, 2)))
     lab, n = ndimage.label(m)
     if n > 1: sizes = ndimage.sum(m, lab, range(1, n + 1)); m = lab == (1 + int(np.argmax(sizes)))
-    out = rgba.copy(); spill = g > np.maximum(r, b)  # despill: green no brighter than the other two
-    out[..., 1] = np.where(m & spill, np.maximum(r, b), out[..., 1])
+    band = m & ~ndimage.binary_erosion(m, iterations=2)
+    out = rgba.copy(); spill = band & (excess > 30) & (others < 120)
+    out[..., ch] = np.where(spill, others + 20, out[..., ch])
     out[..., 3] = np.where(m, 255, 0); out[~m, :3] = 0
     return out
 
 
-def ranger_poses(src, dst, green=False):
+def ranger_poses(src, dst, key=None):
     """2 x 2 Ranger domain poses; the standing hand sign (pose 1) is drawn 12% taller than the fighting stance"""
-    pc = [(clean_green if green else clean_white)(c) for c in cells(os.path.join(src, 'poses.png'), 2, 2)]
+    pc = [(clean_key(c, key) if key else clean_white(c)) for c in cells(os.path.join(src, 'poses.png'), 2, 2)]
     b0 = bbox(pc[0]); sheet, info = strip(pc, 200 * 1.12 / (b0[3] - b0[1] + 1))
     sheet.save(os.path.join(dst, 'poses.png'), optimize=True); return info
 
@@ -206,7 +214,7 @@ def mito(meta):
     m = {}
     bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
     m['bg'] = {'size': list(bg.size), 'floor': 820}
-    m['poses'] = ranger_poses(src, dst, green=True)
+    m['poses'] = ranger_poses(src, dst, key=1)
     meta['mito'] = m
 
 
@@ -222,6 +230,17 @@ def dna(meta):
     meta['dna'] = m
 
 
+def mitosis(meta):
+    src, dst = os.path.join(SRC, 'mitosis'), os.path.join(DST, 'mitosis'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 790, 'poles': [[144, 243], [1519, 244]]}
+    m['poses'] = ranger_poses(src, dst, key=2)
+    cc = [clean_white(c) for c in cells(os.path.join(src, 'props.png'), 2, 2)]
+    b0 = bbox(cc[0]); sheet, info = strip(cc, 200 / (b0[3] - b0[1] + 1)); sheet.save(os.path.join(dst, 'props.png'), optimize=True); m['props'] = info
+    meta['mitosis'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -231,6 +250,7 @@ def main():
     rna(meta)
     mito(meta)
     dna(meta)
+    mitosis(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

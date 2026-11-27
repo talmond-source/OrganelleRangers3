@@ -117,6 +117,20 @@ function drawStrand(g, path, seq, o = {}) {
   if (o.glow) { g.globalCompositeOperation = "lighter"; g.strokeStyle = rgba(o.glow, 0.5); g.lineWidth = w * 2.4; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); }
   g.restore();
 }
+/* a circular double-stranded DNA ring (mtDNA), drawn in code: two strands twisting around each other all the way round,
+   joined by base pairs (red-yellow, green-orange), with a neon glow. cx, cy, r in screen pixels; o.ky tilts it like a frisbee */
+function drawRing(g, cx, cy, r, phase, o = {}) {
+  const N = 36, k = 8, a = r * 0.2, pts = (sgn) => { const p = []; for (let i = 0; i <= 96; i++) { const th = i / 96 * TAU; const rr = r + sgn * a * Math.sin(k * th + phase); p.push([Math.cos(th) * rr, Math.sin(th) * rr]); } return p; };
+  g.save(); g.translate(cx, cy); if (o.rot) g.rotate(o.rot); g.scale(1, o.ky ?? 1); g.globalAlpha = o.alpha ?? 1; g.lineCap = "round";
+  g.save(); g.globalCompositeOperation = "lighter"; const gl = g.createRadialGradient(0, 0, r * 0.6, 0, 0, r * 1.5); gl.addColorStop(0, "rgba(255,140,40,0)"); gl.addColorStop(0.45, rgba(o.glow || "#ff8a2a", 0.45)); gl.addColorStop(1, "rgba(255,140,40,0)"); g.fillStyle = gl; g.beginPath(); g.arc(0, 0, r * 1.5, 0, TAU); g.fill(); g.restore();
+  const lw = Math.max(1.5, r * 0.05);
+  for (let j = 0; j < N; j++) { const th = (j + 0.5) / N * TAU, s1 = Math.sin(k * th + phase), r1 = r + a * s1, r2 = r - a * s1; if (Math.abs(s1) < 0.3) continue; const [c1, c2] = DNA_PAIR[(j * 7 + (j >> 2)) % 4], rm = (r1 + r2) / 2;
+    g.lineWidth = lw * 1.7; g.strokeStyle = c1; g.beginPath(); g.moveTo(Math.cos(th) * r1, Math.sin(th) * r1); g.lineTo(Math.cos(th) * rm, Math.sin(th) * rm); g.stroke(); g.strokeStyle = c2; g.beginPath(); g.moveTo(Math.cos(th) * rm, Math.sin(th) * rm); g.lineTo(Math.cos(th) * r2, Math.sin(th) * r2); g.stroke(); }
+  for (const [sgn, col] of [[1, "#ffb347"], [-1, "#fff1d6"]]) { const p = pts(sgn); g.strokeStyle = "#2a0a06"; g.lineWidth = lw * 1.6 + 2; g.beginPath(); p.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); g.strokeStyle = col; g.lineWidth = lw * 1.6; g.stroke(); }
+  if (o.label) { g.font = `${Math.max(9, r * 0.12) | 0}px P2, monospace`; g.fillStyle = "#ffffff"; g.textAlign = "center"; g.textBaseline = "middle"; const txt = o.label, R2 = r * 1.24, step = 0.13 * 110 / r;
+    for (let i = 0; i < txt.length; i++) { const th = -Math.PI / 2 + (i - txt.length / 2) * step + (o.labelSpin || 0); g.save(); g.rotate(th + Math.PI / 2); g.translate(0, -R2); g.lineWidth = 3; g.strokeStyle = "#2a0a06"; g.strokeText(txt[i], 0, 0); g.fillText(txt[i], 0, 0); g.restore(); } }
+  g.restore();
+}
 function comic(g, text, x, y, size, fill, k = 1, rot = -0.08) { // a pop-art sound effect word
   if (k <= 0.01) return;
   g.save(); g.translate(x, y); g.rotate(rot); g.scale(k, k); g.font = `${size}px Bangers, Impact, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
@@ -601,6 +615,104 @@ const DOMAINS = {
           T.slice.forEach((ts, i) => pop("SLICE!", ts, VIEW.sx(sliceX(i) - s * 0.8), VIEW.sy(ribH[i] + 0.55), 46, "#ff9cf0", i % 2 ? 0.1 : -0.1, 0.45));
           if (t > T.palm + 0.08 && t < T.silent + 0.05) { const [bx, top] = defBox(def, "palm"); X.speech(g, [VIEW.sx(def.x + bx), VIEW.sy(top - 0.1), VIEW.sy(top + 0.1)], ["...?"], 1); }
           pop("SILENCED!", T.silent, VIEW.sx(def.x), VIEW.sy(2.75), 62, "#ffffff", -0.06, 0.5);
+        },
+      };
+    },
+  },
+
+  /* ---------- Mitochondria: mtDNA Disk Barrage. Its own circular DNA, copied eight times and thrown like light disks ---------- */
+  mito: {
+    name: "mtDNA DISK BARRAGE", col: "#ff8a2a", gold: "#ffd36b", mote: "#ffb070", dur: 7.5, shatter: 6.7, pull: 6.45, dim: 0.12,
+    glow: [836, 80, 260, "#ff7a30"],
+    mv: { knock: [4, 7] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { copy: 1.75, double: [1.95, 2.2, 2.45], throw0: 2.85, gap: 0.22, fly: 0.42, gather: 5.0, merge: 5.3, giant: 5.65, through: 5.9, down: 6.15 };
+      const lim = (x) => clamp(x, -HALF + 0.3, HALF - 0.3), ceil = (FLOOR_Y - 100) / 95, startX = att.x, hand = () => [att.x + s * 0.55, 1.3];
+      const wallX = lim(def.x + s * 2.4), L = (k) => lerp(att.x, def.x, k);
+      const paths = [ // each disk's ricochets: walls, ceiling and floor of the domain
+        [[L(0.5), ceil], [def.x, 1.35]],
+        [[L(0.42), 0.05], [def.x, 1.6]],
+        [[wallX, 2.5], [def.x, 1.15]],
+        [[L(0.3), ceil], [L(0.68), 0.05], [def.x, 1.45]],
+        [[L(0.3), 0.05], [L(0.7), ceil], [def.x, 1.25]],
+        [[wallX, 0.6], [def.x, 1.5]],
+        [[L(0.55), ceil], [wallX, 1.9], [def.x, 1.1]],
+        [[L(0.45), 0.05], [wallX, 2.8], [def.x, 1.4]],
+      ];
+      const t0 = (i) => T.throw0 + i * T.gap, hitT = (i) => t0(i) + T.fly;
+      const route = (i) => [hand(), ...paths[i]];
+      const at = (pts, u) => { const d = []; let tot = 0; for (let j = 1; j < pts.length; j++) { const l = Math.hypot(pts[j][0] - pts[j - 1][0], pts[j][1] - pts[j - 1][1]); d.push(l); tot += l; }
+        let want = u * tot; for (let j = 0; j < d.length; j++) { if (want <= d[j] || j === d.length - 1) { const k = clamp(want / d[j]); return [lerp(pts[j][0], pts[j + 1][0], k), lerp(pts[j][1], pts[j + 1][1], k), j]; } want -= d[j]; } };
+      const routes = [];
+      const count = (t) => (t < T.copy ? 0 : t < T.double[0] ? 1 : t < T.double[1] ? 2 : t < T.double[2] ? 4 : 8);
+      const orbit = (i, n, t) => { const a = i / n * TAU + t * 2.2, [hx] = hand(); return [att.x + s * 0.2 + Math.cos(a) * 0.95, 2.05 + Math.sin(a) * 0.45]; };
+      const thrown = (t) => [0, 1, 2, 3, 4, 5, 6, 7].filter((i) => t >= t0(i)).length;
+      const giantR = 1.05, giantPos = (t) => { const a = [att.x + s * 1.25, 2.3]; if (t < T.giant) return a; const u = easeIn(seg(t, T.giant, T.through + 0.25)); return [lerp(a[0], def.x + s * 3.2, u), lerp(a[1], 1.15, Math.min(1, u * 1.6))]; };
+      const poses = [[0, 0], [D.expand, 1], [T.copy, 0]];
+      for (let i = 0; i < 8; i++) poses.push([t0(i) - 0.11, 2], [t0(i), 3]);
+      poses.push([T.gather, 1], [T.giant - 0.14, 2], [T.giant, 3], [T.down + 0.2, 0]);
+      return {
+        poses,
+        camera(t) {
+          if (t < T.giant) { const k = ss(t, D.expand, D.expand + 0.7); return { x: lerp(att.x + s * 0.25, mid, k), S: lerp(150, 92, k) + (t > T.throw0 ? 3 * Math.sin(t * 40) * Math.exp(-((t - T.throw0) % T.gap) * 20) : 0) }; }
+          const k = ss(t, T.giant, T.through); return { x: lerp(mid, def.x - s * 0.5, k), S: lerp(92, 116, k) + 10 * spring(t - T.through, 6, 18) * (t > T.through ? 1 : 0) };
+        },
+        step(t) {
+          if (c.once("copy", T.copy)) game.sfx("disc");
+          T.double.forEach((td, i) => { if (c.once("dbl" + i, td)) { game.sfx("select"); VIEW.flash = 0.03; } });
+          for (let i = 0; i < 8; i++) {
+            if (c.once("th" + i, t0(i))) { game.sfx("disc"); routes[i] = route(i); }
+            if (routes[i]) for (let j = 1; j < routes[i].length - 1; j++) { const pts = routes[i], ub = (() => { let tot = 0, upto = 0; for (let q = 1; q < pts.length; q++) { const l = Math.hypot(pts[q][0] - pts[q - 1][0], pts[q][1] - pts[q - 1][1]); tot += l; if (q <= j) upto += l; } return upto / tot; })();
+              if (c.once("b" + i + "_" + j, t0(i) + ub * T.fly)) { game.sfx("zap"); const [bx, by] = pts[j]; for (let q = 0; q < 8; q++) P.spark(V3(bx, by, 0), q % 2 ? "#ff8a2a" : "#ffffff", 0.1, V3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, 0), 0.3); } }
+            if (c.once("hit" + i, hitT(i))) { c.freeze = i === 7 ? 0.09 : 0.045; VIEW.shake = 0.25 + i * 0.04; game.sfx(i === 7 ? "heavy" : "impact"); def.flash = 0.12; const [, hy] = paths[i][paths[i].length - 1]; P.hit(V3(def.x, hy, 0), "#ff8a2a", 1.1); }
+          }
+          if (c.once("gather", T.gather)) game.sfx("charge");
+          if (c.once("merge", T.merge)) { game.sfx("domain"); VIEW.flash = 0.08; VIEW.shake = 0.3; }
+          if (c.once("giant", T.giant)) game.sfx("disc");
+          if (c.once("through", T.through)) { c.freeze = 0.13; VIEW.impact = 0.16; VIEW.shake = 0.9; FX2D.cx = VIEW.sx(def.x) / VIEW_W; FX2D.cy = VIEW.sy(1.15) / VIEW_H; game.sfx("impact"); game.sfx("boom"); def.flash = 0.2; for (let q = 0; q < 20; q++) { const a = Math.random() * TAU, v = 4 + Math.random() * 7; P.spark(V3(def.x, 1.15, 0), q % 2 ? "#ff8a2a" : "#ffe0b0", 0.13, V3(Math.cos(a) * v, Math.sin(a) * v, 0), 0.45); } }
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(def.x + s * 0.6, 8); }
+        },
+        drawDef(g, t) {
+          if (t < hitT(0)) return X.drawDefIdle(g, t);
+          const fl = def.flash;
+          if (t < T.through) { const n = [0, 1, 2, 3, 4, 5, 6, 7].filter((i) => t >= hitT(i)).length, key = t > hitT(7) + 0.3 ? "dizzy" : n % 2 ? "hitHigh" : "hitBody"; return defPose(g, def, key, def.x, 0, { flash: fl }); }
+          if (t < T.down) { const u = seg(t, T.through, T.down); return defPose(g, def, "launch", def.x + s * 0.6 * u, Math.sin(u * Math.PI) * 0.5, { flash: fl, rot: s * u * 0.4 }); }
+          const u = t - T.down; defPose(g, def, "down", def.x + s * 0.6, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.15 * spring(u, 8, 20)) });
+        },
+        drawProps(g, t) {
+          const S = VIEW.S, rr = 0.3 * S;
+          // copying: one ring becomes 2, 4, 8, orbiting above the Ranger, until each is thrown
+          const n = count(t), gone = thrown(t);
+          if (n > 0 && t < T.throw0 + 8 * T.gap) for (let i = gone; i < n; i++) {
+            const [x, y] = orbit(i, n, t), born = n === 1 ? T.copy : T.double[Math.log2(n) - 1], k = backOut(seg(t, born, born + 0.25));
+            drawRing(g, VIEW.sx(x), VIEW.sy(y), rr * (n === 1 ? 1.4 : 1) * Math.max(0.2, k), t * 6 + i, { ky: 0.85 });
+          }
+          for (let i = 0; i < 8; i++) { // thrown disks: light trails behind, ricochets, and the hit
+            if (!routes[i] || t < t0(i)) continue; const u = seg(t, t0(i), hitT(i)), fade = 1 - seg(t, hitT(i), hitT(i) + 0.35);
+            if (fade <= 0) continue;
+            const pts = routes[i], trail = []; for (let q = 0; q <= 24; q++) { const uu = q / 24 * u; if (uu < u - 0.5) continue; trail.push(at(pts, uu)); }
+            g.save(); g.globalCompositeOperation = "lighter"; g.lineCap = "round"; g.lineJoin = "round";
+            for (const [w, col, al] of [[14, "#ff6a10", 0.35], [6, "#ffb060", 0.8], [2, "#ffffff", 1]]) { g.globalAlpha = al * fade; g.strokeStyle = col; g.lineWidth = w; g.beginPath(); trail.forEach(([x, y], q) => (q ? g.lineTo(VIEW.sx(x), VIEW.sy(y)) : g.moveTo(VIEW.sx(x), VIEW.sy(y)))); g.stroke(); }
+            g.restore();
+            if (u < 1) { const [x, y] = at(pts, u); drawRing(g, VIEW.sx(x), VIEW.sy(y), rr, t * 30, { ky: 0.45, rot: Math.sin(t * 10 + i) * 0.3 }); }
+          }
+          if (t >= T.gather && t < T.merge + 0.1) { // the disks come back and merge into one giant ring
+            const u = easeIn(seg(t, T.gather, T.merge)), [gx, gy] = giantPos(t);
+            for (let i = 0; i < 8; i++) { const a = i / 8 * TAU + t * 3, sx = lerp(def.x + Math.cos(a) * 0.6, gx + Math.cos(a) * giantR * (1 - u), u), sy = lerp(1.3 + Math.sin(a) * 0.5, gy + Math.sin(a) * giantR * (1 - u), u); drawRing(g, VIEW.sx(sx), VIEW.sy(sy), rr * 0.8, t * 20 + i, { ky: 0.8 }); }
+          }
+          if (t >= T.merge && t < T.through + 0.5) {
+            const k = backOut(seg(t, T.merge, T.merge + 0.3)), [gx, gy] = giantPos(t), a = 1 - seg(t, T.through + 0.15, T.through + 0.5), R = giantR * S * k;
+            if (t > T.giant) { g.save(); g.globalCompositeOperation = "lighter"; g.strokeStyle = "rgba(255,140,40,.5)"; g.lineWidth = R * 0.5; g.lineCap = "round"; const [ax, ay] = giantPos(T.giant); g.beginPath(); g.moveTo(VIEW.sx(lerp(ax, gx, 0.5)), VIEW.sy(lerp(ay, gy, 0.5))); g.lineTo(VIEW.sx(gx), VIEW.sy(gy)); g.stroke(); g.restore(); }
+            drawRing(g, VIEW.sx(gx), VIEW.sy(gy), R, t * 12, { alpha: a, label: "16,569 BASE PAIRS · 37 GENES", labelSpin: t * 0.8 });
+          }
+        },
+        text(g, t) {
+          const pop = (word, at0, x, y, size, col, rot, life = 0.5) => { if (t > at0 && t < at0 + life) { const u = t - at0; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          if (t > T.copy && t < T.throw0 + 0.3) { const n = count(t), txt = "mtDNA ×" + n; g.save(); g.font = "18px P2, monospace"; g.textAlign = "center"; g.lineWidth = 6; g.strokeStyle = "#2a0a06"; const x = VIEW.sx(att.x + s * 0.2), y = VIEW.sy(3.0); g.strokeText(txt, x, y); g.fillStyle = "#ffd36b"; g.fillText(txt, x, y); g.restore(); }
+          T.double.forEach((td) => pop("COPY!", td, VIEW.sx(att.x + s * 1.4), VIEW.sy(2.7), 34, "#ffd36b", 0.08, 0.3));
+          for (let i = 0; i < 8; i++) pop((i + 1) + " HIT" + (i ? "S" : "") + "!", hitT(i), VIEW.sx(def.x + s * 1.1), VIEW.sy(2.4 + (i % 2) * 0.2), 34 + i * 3, i === 7 ? "#ff8a2a" : "#ffffff", i % 2 ? 0.08 : -0.08, 0.3);
+          pop("INHERITED FROM MOM!", T.through, VIEW.sx(def.x), VIEW.sy(2.65), 56, "#ffd36b", -0.06, 0.75);
         },
       };
     },

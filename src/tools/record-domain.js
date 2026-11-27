@@ -23,7 +23,7 @@ const [att, opp, out, side = 'left'] = process.argv.slice(2);
     document.getElementById('announce').innerHTML = ''; window.__g = g; return true;
   }, [att, opp, side]);
   let i = 0; const times = [];
-  for (let f = 0; f < 60 * 8.6; f += 2) {
+  for (let f = 0; f < 60 * 9.4; f += 2) {
     const st = await p.evaluate(() => { const g = window.__g; for (let k = 0; k < 2; k++) { if (g.phase === 'over') break; g.step(); g.render(1 / 60); } APP.drawFight(2 / 60); HUD.update(g); return g.phase + ' ' + (g.cine ? g.cine.t.toFixed(2) : '-'); });
     await p.locator('#game').screenshot({ path: path.join(out, 'f' + String(i++).padStart(4, '0') + '.png') });
     times.push(st); if (i % 30 === 0) console.log(i, st);

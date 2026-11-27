@@ -38,6 +38,11 @@ Silent Shadow Interference (rna):
   poses.png   2 x 2 RNA Ranger poses: hand sign (two-finger seal), expansion, throw, ninja dash. The shadow ninjas are
               these same poses drawn as silhouettes
   dicer.png   2 x 2: Dicer blades up, Dicer chopping, a smoke puff, a smoke burst -> dicer.png (top row) + smoke.png
+
+mtDNA Disk Barrage (mito):
+  bg.png      inside a mitochondrion: cristae with ATP synthase facing the matrix, a grid floor (the matrix)
+  poses.png   2 x 2 Mitochondria Ranger poses on a GREEN screen (the suit is white): hand sign, expansion, throw
+              wind-up, throw release. Cut with clean_green. The mtDNA disks are drawn in code
 """
 import os, sys, json
 import numpy as np
@@ -111,9 +116,30 @@ def nucleus(meta):
     meta['nucleus'] = m
 
 
-def ranger_poses(src, dst):
+def clean_green(rgba):
+    """Cutout for sheets drawn on a flat bright green screen (for white characters): removes the green, the
+    green-tinted rim pixels, and green spill on the edge; keeps the biggest piece."""
+    from scipy import ndimage
+    rgb = rgba[..., :3].astype(int); r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    key = (g > 150) & (g - np.maximum(r, b) > 60)
+    m = ~key
+    for _ in range(3):  # peel greenish rim pixels
+        edge = m & ~ndimage.binary_erosion(m)
+        peel = edge & (g - np.maximum(r, b) > 18)
+        if not peel.any(): break
+        m &= ~peel
+    m = ndimage.binary_opening(m, structure=np.ones((2, 2)))
+    lab, n = ndimage.label(m)
+    if n > 1: sizes = ndimage.sum(m, lab, range(1, n + 1)); m = lab == (1 + int(np.argmax(sizes)))
+    out = rgba.copy(); spill = g > np.maximum(r, b)  # despill: green no brighter than the other two
+    out[..., 1] = np.where(m & spill, np.maximum(r, b), out[..., 1])
+    out[..., 3] = np.where(m, 255, 0); out[~m, :3] = 0
+    return out
+
+
+def ranger_poses(src, dst, green=False):
     """2 x 2 Ranger domain poses; the standing hand sign (pose 1) is drawn 12% taller than the fighting stance"""
-    pc = [clean_white(c) for c in cells(os.path.join(src, 'poses.png'), 2, 2)]
+    pc = [(clean_green if green else clean_white)(c) for c in cells(os.path.join(src, 'poses.png'), 2, 2)]
     b0 = bbox(pc[0]); sheet, info = strip(pc, 200 * 1.12 / (b0[3] - b0[1] + 1))
     sheet.save(os.path.join(dst, 'poses.png'), optimize=True); return info
 
@@ -169,6 +195,15 @@ def rna(meta):
     meta['rna'] = m
 
 
+def mito(meta):
+    src, dst = os.path.join(SRC, 'mito'), os.path.join(DST, 'mito'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 820}
+    m['poses'] = ranger_poses(src, dst, green=True)
+    meta['mito'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -176,6 +211,7 @@ def main():
     rougher(meta)
     crispr(meta)
     rna(meta)
+    mito(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

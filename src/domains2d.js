@@ -62,6 +62,41 @@ function defMorph(g, def, key, x, y, o = {}) {
   if (o.skew) g.transform(1, 0, o.skew, 1, 0, 0); g.scale(o.kx ?? 1, o.ky ?? 1); g.translate(-cx, -cy);
   defPose(g, def, key, x, y, { flash: o.flash, alpha: o.alpha }); g.restore();
 }
+/* A horizontal stretch of DNA drawn in code, so the base pairs and the twist are always right:
+   a RIGHT-handed double helix (the strand in front always slopes down to the right), about 10.5 base pairs per turn,
+   red always paired with yellow (A-T) and green with orange (G-C). Positions are in world metres.
+   o.cut: x of a double-strand break; o.gap: how far the two pieces have pulled apart there; o.tilt: their droop;
+   o.hi: [x0, x1, colour] a highlighted window (the guide RNA); o.pam: x where the PAM's 3 rungs start (drawn gold-ringed) */
+const DNA_PAIR = { 0: ["#e23430", "#face28"], 1: ["#face28", "#e23430"], 2: ["#60c438", "#f6841c"], 3: ["#f6841c", "#60c438"] };
+function drawDNA(g, x0, x1, cy, o = {}) {
+  const S = VIEW.S, turn = o.turn || 1.6, step = turn / 10.5, R = o.R || 0.3, w = Math.max(3, 0.09 * S), seq = o.seq || ((i) => (i * 7 + (i >> 2) * 3) % 4);
+  const piece = (x) => (o.cut == null ? 0 : x < o.cut ? -1 : 1);
+  const pos = (x, strand) => { // screen point of a strand at x, after the cut pieces have moved
+    const th = (x - x0) / turn * TAU + (strand ? Math.PI : 0) + (o.phase || 0), side = piece(x), off = side * (o.gap || 0), d = side ? (x - o.cut) * side : 0;
+    return [VIEW.sx(x + off), VIEW.sy(cy - Math.sin(th) * R - side * d * (o.tilt || 0)), Math.cos(th)];
+  };
+  const seg = [], n = Math.ceil((x1 - x0) / 0.02);
+  for (let i = 0; i < n; i++) for (const st of [0, 1]) { const xa = x0 + i * 0.02, xb = Math.min(x1, xa + 0.022); if (o.cut != null && xa < o.cut && xb > o.cut) continue; const p = pos(xa, st), q = pos(xb, st); seg.push({ z: (p[2] + q[2]) / 2, p, q, st }); }
+  const draw = (list) => { for (const sgm of list) { g.strokeStyle = "#140a24"; g.lineWidth = w + 4; g.beginPath(); g.moveTo(sgm.p[0], sgm.p[1]); g.lineTo(sgm.q[0], sgm.q[1]); g.stroke(); }
+    for (const sgm of list) { const lit = 0.75 + 0.25 * sgm.z; g.strokeStyle = sgm.st ? `rgb(${168 * lit | 0},${60 * lit | 0},${230 * lit | 0})` : `rgb(${30 * lit | 0},${200 * lit | 0},${200 * lit | 0})`; g.lineWidth = w; g.beginPath(); g.moveTo(sgm.p[0], sgm.p[1]); g.lineTo(sgm.q[0], sgm.q[1]); g.stroke(); } };
+  g.save(); g.globalAlpha = o.alpha ?? 1; g.lineCap = "round";
+  draw(seg.filter((q) => q.z < 0));
+  if (o.hi) { // the guide RNA's window: a tinted band with corner brackets
+    const [ha, hb, hc] = o.hi, a0 = VIEW.sx(Math.min(ha, hb)), b0 = VIEW.sx(Math.max(ha, hb)), t0 = VIEW.sy(cy + R * 1.7), h0 = R * 3.4 * S;
+    g.save(); g.fillStyle = rgba(hc, 0.22); g.fillRect(a0, t0, b0 - a0, h0); g.strokeStyle = hc; g.lineWidth = 3; const L = Math.min(18, (b0 - a0) / 4);
+    for (const [x, d] of [[a0, 1], [b0, -1]]) { g.beginPath(); g.moveTo(x + d * L, t0); g.lineTo(x, t0); g.lineTo(x, t0 + h0); g.lineTo(x + d * L, t0 + h0); g.stroke(); } g.restore(); }
+  const nr = Math.floor((x1 - x0) / step);
+  for (let i = 0; i <= nr; i++) { // the rungs: each base pair is two halves meeting in the middle
+    const x = x0 + i * step + step * 0.5; if (x > x1 || (o.cut != null && Math.abs(x - o.cut) < step * 0.4)) continue;
+    const a = pos(x, 0), b = pos(x, 1), [c1, c2] = DNA_PAIR[seq(i)], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, rw = Math.max(2, w * 0.55);
+    g.strokeStyle = "#140a24"; g.lineWidth = rw + 3; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(b[0], b[1]); g.stroke();
+    g.lineWidth = rw; g.strokeStyle = c1; g.beginPath(); g.moveTo(a[0], a[1]); g.lineTo(mx, my); g.stroke(); g.strokeStyle = c2; g.beginPath(); g.moveTo(mx, my); g.lineTo(b[0], b[1]); g.stroke();
+    if (o.pam != null && x >= o.pam && x < o.pam + step * 3) { g.strokeStyle = "#ffe14d"; g.lineWidth = 2; g.beginPath(); g.arc(mx, my, Math.abs(a[1] - b[1]) / 2 + 5, 0, TAU); g.stroke(); }
+    if (o.bad && Math.abs(x - o.bad) < step * 1.1) { g.strokeStyle = "#ff3355"; g.lineWidth = 3; g.beginPath(); g.moveTo(mx - 7, my - 7); g.lineTo(mx + 7, my + 7); g.moveTo(mx + 7, my - 7); g.lineTo(mx - 7, my + 7); g.stroke(); }
+  }
+  draw(seg.filter((q) => q.z >= 0)); g.restore();
+  return step;
+}
 function comic(g, text, x, y, size, fill, k = 1, rot = -0.08) { // a pop-art sound effect word
   if (k <= 0.01) return;
   g.save(); g.translate(x, y); g.rotate(rot); g.scale(k, k); g.font = `${size}px Bangers, Impact, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
@@ -318,6 +353,99 @@ const DOMAINS = {
           pop("\u03b2-SHEET!", T.sheet + 0.05, side, VIEW.sy(1.9), 52, "#ffd0a0", -0.1);
           pop("FOLDED!", T.fold + 0.08, side, VIEW.sy(2.2), 56, "#ff7a2e");
           CR.forEach((c0, i) => pop("CRUNCH!", c0, VIEW.sx(def.x) + (i % 2 ? -1 : 1) * 120, VIEW.sy(2.5 + 0.25 * i), 52 + 8 * i, i === 2 ? "#ff7a2e" : "#ffffff", i % 2 ? 0.12 : -0.12));
+        },
+      };
+    },
+  },
+
+  /* ---------- CRISPR: Precision Cut Theater. A guide RNA finds the opponent's matching DNA, a PAM unlocks it, Cas9 cuts both strands ---------- */
+  crispr: {
+    name: "PRECISION CUT THEATER", col: "#2fe0c8", gold: "#c98bff", mote: "#7ff1e2", dur: 7.4, shatter: 6.6, pull: 6.35, dim: 0.1,
+    glow: [836, 110, 200, "#9ff5ff"],
+    mv: { knock: [3, 6] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { bind: 1.95, scan: 2.35, match: 3.15, cmd: 3.55, fly: 3.6, snip: 4.3, slide: 4.32, repair: 4.95, stamp: 5.25, drop: 5.9 };
+      const dnaY = 1.2, half = 3.0, x0 = def.x - half, x1 = def.x + half, step = 1.6 / 10.5;
+      // the PAM sits on the far side of the cut; Cas9 cuts 3 letters before it, and the 20-letter target runs back toward the attacker
+      const cutX = def.x, pamX = s > 0 ? cutX + step * 3 : cutX - step * 6, tA = s > 0 ? cutX - step * 17 : cutX + step * 3, tB = tA + step * 20;
+      const scanX = (t) => lerp(s > 0 ? x0 : x1 - step * 20, tA, easeOut(seg(t, T.scan, T.match))); // the guide RNA's window slides along until it matches
+      const C = M.cas9, cpx = () => VIEW.S * 1.9 / C.frames[0][2];
+      const gap = (t) => (t < T.snip ? 0 : t < T.repair ? 0.42 * easeOut(seg(t, T.snip, T.snip + 0.25)) : 0.42 * (1 - backOut(seg(t, T.repair, T.repair + 0.25))));
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.cmd, 2], [T.snip, 3]],
+        camera(t) {
+          if (t < T.bind) { const k = ss(t, D.expand, D.expand + 0.7); return { x: lerp(att.x + s * 0.25, mid, k), S: lerp(150, 100, k) }; }
+          if (t < T.drop) { const k = ss(t, T.bind, T.scan + 0.3); return { x: lerp(mid, cutX - s * 1.25, k), S: lerp(100, 112, k) + 10 * spring(t - T.snip, 6, 18) * (t > T.snip ? 1 : 0) + 8 * ss(t, T.repair, T.stamp) }; }
+          const k = ss(t, T.drop, T.drop + 0.3); return { x: lerp(cutX - s * 1.25, mid, k), S: lerp(120, 108, k) };
+        },
+        step(t) {
+          if (c.once("bind", T.bind)) { game.sfx("charge"); def.flash = 0.1; }
+          if (c.once("scan", T.scan)) game.sfx("zap");
+          if (t > T.scan && t < T.match && Math.random() < 0.25) game.sfx("zap");
+          if (c.once("match", T.match)) { game.sfx("ding"); VIEW.flash = 0.04; }
+          if (c.once("pam", T.match + 0.2)) game.sfx("select");
+          if (c.once("fly", T.fly)) game.sfx("whoosh");
+          if (c.once("snip", T.snip)) { c.freeze = 0.13; VIEW.impact = 0.16; VIEW.shake = 0.8; FX2D.cx = VIEW.sx(cutX) / VIEW_W; FX2D.cy = VIEW.sy(dnaY) / VIEW_H; game.sfx("impact"); game.sfx("cut"); def.flash = 0.2;
+            for (let i = 0; i < 18; i++) { const a = Math.random() * TAU, v = 3 + Math.random() * 7; P.spark(V3(cutX, dnaY, 0), i % 2 ? D.col : "#ffffff", 0.13, V3(Math.cos(a) * v, Math.sin(a) * v, 0), 0.4); } }
+          if (c.once("repair", T.repair)) { game.sfx("block"); def.flash = 0.12; }
+          if (c.once("stamp", T.stamp)) { game.sfx("heavy"); VIEW.shake = 0.5; }
+          if (c.once("drop", T.drop)) { game.sfx("land"); X.grit(def.x, 8); }
+        },
+        drawDef(g, t) {
+          if (t < T.bind) return X.drawDefIdle(g, t);
+          const key = t < T.drop ? "hitHigh" : "down", fl = def.flash;
+          if (t < T.slide || t >= T.drop) { // bound in place, then (after the knockout) collapsed
+            if (t >= T.drop) { const u = t - T.drop, flat = SPR.extra[def.id] ? 1 : 0.5; return defPose(g, def, "down", def.x, 0, { squash: flat * (1 - 0.15 * spring(u, 8, 20)) }); }
+            return defPose(g, def, key, def.x, 0, { flash: fl });
+          }
+          // cut: the two halves slide apart along the slash, then snap back crooked and glitching (sloppy repair = knockout)
+          const cy = VIEW.sy(dnaY), cx = VIEW.sx(cutX), sl = -0.35 * s, glitch = t > T.repair;
+          const off = t < T.repair ? 0.36 * VIEW.S * easeOut(seg(t, T.slide, T.slide + 0.2)) : 0.05 * VIEW.S * (1 - seg(t, T.repair, T.drop) * 0.5);
+          const halfDraw = (top, dx, dy) => { g.save(); g.beginPath(); const W = VIEW_W * 2; if (top) { g.moveTo(cx - W, cy - W * sl); g.lineTo(cx + W, cy + W * sl); g.lineTo(cx + W, -W); g.lineTo(cx - W, -W); } else { g.moveTo(cx - W, cy - W * sl); g.lineTo(cx + W, cy + W * sl); g.lineTo(cx + W, W); g.lineTo(cx - W, W); } g.closePath(); g.clip(); g.translate(dx, dy);
+            if (glitch) { g.globalAlpha = 0.55; drawFrame(g, def.id, SPR.extra[def.id] ? XE[key] : 0, def.x - 0.04, 0, def.face, { extra: !!SPR.extra[def.id], silhouette: "#ff2bd6" }); drawFrame(g, def.id, SPR.extra[def.id] ? XE[key] : 0, def.x + 0.04, 0, def.face, { extra: !!SPR.extra[def.id], silhouette: "#2bf3ff" }); g.globalAlpha = 1; }
+            defPose(g, def, key, def.x, 0, { flash: fl }); g.restore(); };
+          halfDraw(false, 0, 0); halfDraw(true, s * off, -off * 0.25);
+          if (glitch && Math.random() < 0.5) { const yy = cy + (Math.random() - 0.5) * 1.4 * VIEW.S; g.save(); g.globalCompositeOperation = "lighter"; g.fillStyle = Math.random() < 0.5 ? "rgba(255,43,214,.35)" : "rgba(43,243,255,.35)"; g.fillRect(cx - 0.6 * VIEW.S, yy, 1.2 * VIEW.S, 3 + Math.random() * 5); g.restore(); }
+        },
+        drawProps(g, t) {
+          if (t >= T.bind && t < T.drop + 0.3) { // the opponent's DNA, locked across their chest
+            const grow = easeOut(seg(t, T.bind, T.bind + 0.4)), a = 1 - seg(t, T.drop, T.drop + 0.3), xa = s > 0 ? x0 : lerp(x1, x0, grow), xb = s > 0 ? lerp(x0, x1, grow) : x1;
+            let hi = null;
+            if (t >= T.scan && t < T.match) hi = [scanX(t), scanX(t) + step * 20, "#ff9a3c"];
+            else if (t >= T.match && t < T.snip) hi = [tA, tB, (t - T.match) % 0.2 < 0.1 ? "#7dff8a" : "#3ad15a"];
+            drawDNA(g, xa, xb, dnaY, { alpha: a, hi, pam: t >= T.match + 0.15 && t < T.snip ? pamX : null, cut: t >= T.snip ? cutX : null, gap: gap(t), tilt: t >= T.snip && t < T.repair ? 0.12 * seg(t, T.snip, T.snip + 0.25) : 0, bad: t >= T.repair ? cutX : null, phase: t * 0.6 });
+            if (t >= T.match + 0.15 && t < T.snip) { // the PAM reticle snaps on: NGG
+              const k = backOut(seg(t, T.match + 0.15, T.match + 0.4)), px = VIEW.sx(pamX + step * 1.5), py = VIEW.sy(dnaY), r = (0.38 + 0.5 * (1 - k)) * VIEW.S;
+              g.save(); g.translate(px, py); g.rotate((1 - k) * 1.5); g.strokeStyle = "#ffe14d"; g.lineWidth = 3; for (let i = 0; i < 4; i++) { g.rotate(Math.PI / 2); g.beginPath(); g.moveTo(r, r * 0.45); g.lineTo(r, r); g.lineTo(r * 0.45, r); g.stroke(); } g.restore();
+              g.save(); g.font = "14px P2, monospace"; g.textAlign = "center"; g.lineWidth = 5; g.strokeStyle = "#140a24"; g.strokeText("PAM: NGG", px, py + r + 22); g.fillStyle = "#ffe14d"; g.fillText("PAM: NGG", px, py + r + 22); g.restore();
+            }
+            if (t >= T.scan && t < T.snip) { // the guide RNA readout
+              const ok = t >= T.match, txt = ok ? "GUIDE RNA: MATCH" : "GUIDE RNA: SCANNING" + ".".repeat(1 + Math.floor(t * 6) % 3), tx = VIEW.sx((ok ? tA + tB : scanX(t) * 2 + step * 20) / 2), ty = VIEW.sy(dnaY + 0.62);
+              g.save(); g.font = "13px P2, monospace"; g.textAlign = "center"; g.lineWidth = 5; g.strokeStyle = "#140a24"; g.strokeText(txt, tx, ty); g.fillStyle = ok ? "#7dff8a" : "#ffb070"; g.fillText(txt, tx, ty); g.restore();
+            }
+          }
+          if (t >= T.fly && t < T.repair) { // Cas9 swoops in from above, blades pointing down across the DNA, and snaps shut
+            const u = easeOut(seg(t, T.fly, T.fly + 0.45)), leave = seg(t, T.snip + 0.35, T.repair), px = cpx(), f = t < T.snip ? 0 : 1;
+            const tipY = dnaY - 0.35, cyW = tipY + C.frames[0][2] * px / VIEW.S * 0.5, x = lerp(cutX - s * 3, cutX, u), y = lerp(cyW + 3.5, cyW, u) + leave * 4;
+            const pre = t > T.fly + 0.45 && t < T.snip ? Math.sin(t * 50) * 0.03 : 0; // trembling before the cut
+            domCentered(g, IM.cas9, C, f, VIEW.sx(x + pre), VIEW.sy(y), px, { rot: Math.PI / 2 + (1 - u) * -s * 1.2, alpha: 1 - leave, ky: s });
+          }
+          if (t >= T.snip && t < T.snip + 0.3) { // the cut line through both strands
+            const u = seg(t, T.snip, T.snip + 0.3), x = VIEW.sx(cutX); g.save(); g.globalAlpha = 1 - u; g.globalCompositeOperation = "lighter"; g.strokeStyle = "#ffffff"; g.lineWidth = 10 * (1 - u) + 2; g.beginPath(); g.moveTo(x - s * 240, VIEW.sy(dnaY) - 240 * 0.35); g.lineTo(x + s * 240, VIEW.sy(dnaY) + 240 * 0.35); g.stroke(); g.restore();
+          }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.55) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.13, life)), rot); } };
+          pop("MATCH FOUND!", T.match, VIEW.sx((tA + tB) / 2), VIEW.sy(2.55), 48, "#7dff8a", -0.06, 0.6);
+          pop("SNIP!", T.snip, VIEW.sx(cutX + s * 1.1), VIEW.sy(2.3), 76, "#ffffff", 0.1, 0.6);
+          pop("SLOPPY REPAIR...", T.repair, VIEW.sx(cutX), VIEW.sy(2.65), 34, "#ffb070", -0.04, 0.5);
+          if (t > T.stamp && t < D.shatter) { // the stamp: GENE KNOCKOUT
+            const u = t - T.stamp, k = u < 0.12 ? lerp(2.2, 1, easeIn(u / 0.12)) : 1 + 0.05 * spring(u - 0.12, 10, 30), x = VIEW.sx(def.x), y = VIEW.sy(1.35);
+            g.save(); g.translate(x, y); g.rotate(-0.16); g.scale(k, k); g.globalAlpha = Math.min(1, u / 0.08);
+            g.strokeStyle = "#e8233c"; g.lineWidth = 7; g.strokeRect(-190, -42, 380, 84); g.lineWidth = 2; g.strokeRect(-180, -33, 360, 66);
+            g.font = "48px Bangers, Impact, sans-serif"; g.textAlign = "center"; g.textBaseline = "middle"; g.fillStyle = "#e8233c"; g.fillText("GENE KNOCKOUT!", 0, 3); g.restore();
+          }
         },
       };
     },

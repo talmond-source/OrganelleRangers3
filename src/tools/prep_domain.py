@@ -25,6 +25,13 @@ Factory Finesse (rougher):
               threads through the membrane into the ER, it never dangles loose into the room
   poses.png   2 x 2 Rough ER Ranger poses: hand sign, expansion, operating (claws), crushing clap
   vesicle.png 2 x 2 coated vesicle: half-built cage, closed cage, cage bursting, one ribosome
+
+Precision Cut Theater (crispr):
+  bg.png      the gene-editing theater. bg-original.png is ChatGPT's picture; bg.png has its DNA rungs repainted as
+              consistent base pairs by tools/fix_base_pairs.py (red with yellow, green with orange)
+  poses.png   2 x 2 CRISPR Ranger poses: hand sign, expansion, command, snip finish
+  cas9-original.png  Cas9 open and shut (top row). Its DNA pieces (bottom row) are not used: the game draws that DNA
+              itself so the pairs, the twist and the cut site are exact
 """
 import os, sys, json
 import numpy as np
@@ -129,11 +136,24 @@ def rougher(meta):
     meta['rougher'] = m
 
 
+def crispr(meta):
+    src, dst = os.path.join(SRC, 'crispr'), os.path.join(DST, 'crispr'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 800}
+    m['poses'] = ranger_poses(src, dst)
+    cc = [clean_white(c) for c in cells(os.path.join(src, 'cas9-original.png'), 2, 2)[:2]]
+    b0 = bbox(cc[0]); sheet, info = strip(cc, 300 / (b0[2] - b0[0] + 1))
+    sheet.save(os.path.join(dst, 'cas9.png'), optimize=True); m['cas9'] = info
+    meta['crispr'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
     golgi(meta)
     rougher(meta)
+    crispr(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

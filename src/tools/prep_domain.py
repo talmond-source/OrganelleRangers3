@@ -43,6 +43,12 @@ mtDNA Disk Barrage (mito):
   bg.png      inside a mitochondrion: cristae with ATP synthase facing the matrix, a grid floor (the matrix)
   poses.png   2 x 2 Mitochondria Ranger poses on a GREEN screen (the suit is white): hand sign, expansion, throw
               wind-up, throw release. Cut with clean_green. The mtDNA disks are drawn in code
+
+Twin Serpent Fork (dna):
+  bg.png      a temple courtyard in the nucleus (nucleosome lanterns, right-handed helix pillars)
+  poses.png   2 x 2 DNA Ranger poses: hand sign (palms together), expansion, unzip, twin strike
+  props.png   2 x 2: serpent head closed, head open, helicase (6-lobed ring), DNA polymerase (hand-shaped)
+              -> heads.png + enzymes.png. The serpents' bodies are double helices drawn in code
 """
 import os, sys, json
 import numpy as np
@@ -204,6 +210,18 @@ def mito(meta):
     meta['mito'] = m
 
 
+def dna(meta):
+    src, dst = os.path.join(SRC, 'dna'), os.path.join(DST, 'dna'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 770}
+    m['poses'] = ranger_poses(src, dst)
+    cc = [clean_white(c) for c in cells(os.path.join(src, 'props.png'), 2, 2)]
+    b0 = bbox(cc[0]); sheet, info = strip(cc[:2], 300 / (b0[2] - b0[0] + 1)); sheet.save(os.path.join(dst, 'heads.png'), optimize=True); m['heads'] = info
+    b0 = bbox(cc[2]); sheet, info = strip(cc[2:], 220 / (b0[2] - b0[0] + 1)); sheet.save(os.path.join(dst, 'enzymes.png'), optimize=True); m['enzymes'] = info
+    meta['dna'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -212,6 +230,7 @@ def main():
     crispr(meta)
     rna(meta)
     mito(meta)
+    dna(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

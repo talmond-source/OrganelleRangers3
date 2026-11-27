@@ -131,6 +131,35 @@ function drawRing(g, cx, cy, r, phase, o = {}) {
     for (let i = 0; i < txt.length; i++) { const th = -Math.PI / 2 + (i - txt.length / 2) * step + (o.labelSpin || 0); g.save(); g.rotate(th + Math.PI / 2); g.translate(0, -R2); g.lineWidth = 3; g.strokeStyle = "#2a0a06"; g.strokeText(txt[i], 0, 0); g.fillText(txt[i], 0, 0); g.restore(); } }
   g.restore();
 }
+/* a double helix that follows any curve P(u) (world metres, u 0..1): the same right-handed twist, 10.5 base pairs
+   per turn and red-yellow / green-orange pairs as drawDNA. Each strand can be shown or hidden, and coloured, along u,
+   so a helix can be unzipped and rebuilt. Where only one strand is present, its bases stick out on their own.
+   Returns the end of the curve (screen x, y) and its direction, for a head. */
+function drawHelixPath(g, P, o = {}) {
+  const S = VIEW.S, n = 120, R = o.R ?? 0.28, turn = o.turn ?? 1.5, step = turn / 10.5, pts = [];
+  let len = 0, prev = P(0);
+  for (let i = 0; i <= n; i++) { const u = i / n, p = P(u), q = P(Math.min(1, u + 0.005)), r = P(Math.max(0, u - 0.005)); if (i) len += Math.hypot(p[0] - prev[0], p[1] - prev[1]); prev = p;
+    let tx = q[0] - r[0], ty = q[1] - r[1]; const tl = Math.hypot(tx, ty) || 1; tx /= tl; ty /= tl; const th = len / turn * TAU + (o.phase || 0), off = Math.sin(th) * R;
+    pts.push({ u, len, x: p[0], y: p[1], tx, ty, s0: [p[0] + ty * off, p[1] - tx * off], s1: [p[0] - ty * off, p[1] + tx * off], z: Math.cos(th) }); }
+  const vis = [o.show0 || (() => true), o.show1 || (() => true)], col = [o.col0 || (() => "#1ec8c8"), o.col1 || (() => "#a83ce6")], w = Math.max(3, 0.09 * S);
+  g.save(); g.globalAlpha = o.alpha ?? 1; g.lineCap = "round";
+  const strand = (k, front) => { for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], z = (k ? -1 : 1) * (a.z + b.z) / 2; if ((z >= 0) !== front || !vis[k](a.u) || !vis[k](b.u)) continue;
+      const A = k ? a.s1 : a.s0, B = k ? b.s1 : b.s0, lit = 0.72 + 0.28 * z; g.strokeStyle = "#140a24"; g.lineWidth = w + 4; g.beginPath(); g.moveTo(VIEW.sx(A[0]), VIEW.sy(A[1])); g.lineTo(VIEW.sx(B[0]), VIEW.sy(B[1])); g.stroke();
+      g.strokeStyle = col[k](a.u); g.globalAlpha = (o.alpha ?? 1) * (0.55 + 0.45 * lit); g.lineWidth = w; g.stroke(); g.globalAlpha = o.alpha ?? 1; } };
+  strand(0, false); strand(1, false);
+  const nr = Math.floor(len / step);
+  for (let r = 0; r < nr; r++) {
+    const L = (r + 0.5) * step; let i = 1; while (i < pts.length - 1 && pts[i].len < L) i++; const a = pts[i]; const v0 = vis[0](a.u), v1 = vis[1](a.u); if (!v0 && !v1) continue;
+    const [c1, c2] = DNA_PAIR[(r * 7 + (r >> 2) * 3 + (o.seed || 0)) % 4], A = [VIEW.sx(a.s0[0]), VIEW.sy(a.s0[1])], B = [VIEW.sx(a.s1[0]), VIEW.sy(a.s1[1])], M = [(A[0] + B[0]) / 2, (A[1] + B[1]) / 2], rw = Math.max(2, w * 0.55);
+    const half = (F, T, c) => { g.strokeStyle = "#140a24"; g.lineWidth = rw + 3; g.beginPath(); g.moveTo(F[0], F[1]); g.lineTo(T[0], T[1]); g.stroke(); g.strokeStyle = c; g.lineWidth = rw; g.stroke(); };
+    if (Math.hypot(A[0] - B[0], A[1] - B[1]) < rw * 1.5) continue;
+    if (v0) half(A, M, c1); if (v1) half(B, M, c2);
+  }
+  strand(0, true); strand(1, true);
+  g.restore();
+  const e = pts[pts.length - 1]; return [VIEW.sx(e.x), VIEW.sy(e.y), Math.atan2(-e.ty, e.tx)];
+}
+const bez = (P0, P1, P2, P3) => (u) => { const v = 1 - u; return [v * v * v * P0[0] + 3 * v * v * u * P1[0] + 3 * v * u * u * P2[0] + u * u * u * P3[0], v * v * v * P0[1] + 3 * v * v * u * P1[1] + 3 * v * u * u * P2[1] + u * u * u * P3[1]]; };
 function comic(g, text, x, y, size, fill, k = 1, rot = -0.08) { // a pop-art sound effect word
   if (k <= 0.01) return;
   g.save(); g.translate(x, y); g.rotate(rot); g.scale(k, k); g.font = `${size}px Bangers, Impact, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
@@ -713,6 +742,111 @@ const DOMAINS = {
           T.double.forEach((td) => pop("COPY!", td, VIEW.sx(att.x + s * 1.4), VIEW.sy(2.7), 34, "#ffd36b", 0.08, 0.3));
           for (let i = 0; i < 8; i++) pop((i + 1) + " HIT" + (i ? "S" : "") + "!", hitT(i), VIEW.sx(def.x + s * 1.1), VIEW.sy(2.4 + (i % 2) * 0.2), 34 + i * 3, i === 7 ? "#ff8a2a" : "#ffffff", i % 2 ? 0.08 : -0.08, 0.3);
           pop("INHERITED FROM MOM!", T.through, VIEW.sx(def.x), VIEW.sy(2.65), 56, "#ffd36b", -0.06, 0.75);
+        },
+      };
+    },
+  },
+
+  /* ---------- DNA: Twin Serpent Fork. Replication: helicase unzips the serpent, polymerase builds two copies, each half old and half new ---------- */
+  dna: {
+    name: "TWIN SERPENT FORK", col: "#3c8cff", gold: "#ffd36b", mote: "#9cc4ff", dur: 7.5, shatter: 6.7, pull: 6.45, dim: 0.12,
+    glow: [836, 40, 300, "#8a7dff"],
+    mv: { knock: [4, 7] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { rise: 1.55, unzip: 2.45, unzipEnd: 3.35, ligase: 3.6, copies: 3.8, strike: 4.15, bites: [4.3, 4.65, 5.0], fin: 5.45, down: 5.85 };
+      const lim = (x) => clamp(x, -HALF + 0.3, HALF - 0.3), V = (x, y) => [x, y];
+      const B0 = V(lim(att.x - s * 1.1), -0.3);
+      const single = [B0, V(att.x - s * 1.6, 2.9), V(mid - s * 0.6, 3.7), V(mid + s * 0.35, 2.75)];
+      const restA = [B0, V(att.x - s * 1.8, 3.2), V(mid - s * 0.5, 3.9), V(mid + s * 0.55, 3.3)];
+      const restB = [B0, V(att.x - s * 0.4, 1.2), V(mid - s * 0.8, 0.3), V(mid + s * 0.2, 0.95)];
+      const tgt = V(def.x - s * 0.35, 1.3);
+      const fork = (t) => 1 - ss(t, T.unzip, T.unzipEnd); // the replication fork runs from the head down to the root
+      const wsplit = (u, t) => ss(u, fork(t), fork(t) + 0.15);
+      const bite = (t, at, dur = 0.4) => { const u = (t - at) / dur; return u < 0 || u > 1 ? 0 : u < 0.3 ? easeOut(u / 0.3) : u < 0.5 ? 1 : 1 - easeIn((u - 0.5) / 0.5); };
+      const ctrl = (k, t) => { // serpent k's curve right now: its rest pose, pushed toward the opponent while it bites
+        const rest = k ? restB : restA, bt = k ? bite(t, T.bites[1]) : Math.max(bite(t, T.bites[0]), bite(t, T.bites[2])), fin = t < T.fin ? 0 : t < T.fin + 0.2 ? easeOut(seg(t, T.fin, T.fin + 0.14)) : 1 - easeIn(seg(t, T.fin + 0.3, T.fin + 0.7));
+        const hit = k ? V(def.x - s * 0.1, 0.85) : V(def.x - s * 0.1, 1.75), b = Math.max(bt, fin), aim = fin > bt ? hit : tgt;
+        const coil = t > T.strike ? 0.12 * Math.sin(t * 5 + k * 2) : 0;
+        return [rest[0], rest[1], V(lerp(rest[2][0], (rest[2][0] + aim[0]) / 2, b), lerp(rest[2][1], aim[1] + (k ? -0.6 : 0.8), b) + coil), V(lerp(rest[3][0], aim[0], b), lerp(rest[3][1], aim[1], b) + coil * 0.6)];
+      };
+      const curve = (k, t) => { const sp = bez(...single), sk = bez(...ctrl(k, t)); return (u) => { const w = wsplit(u, t), a = sp(u), b = sk(u); return [lerp(a[0], b[0], w), lerp(a[1], b[1], w)]; }; };
+      const grow = (t) => easeOut(seg(t, T.rise, T.rise + 0.6));
+      const LB = [0, 0.2, 0.4, 0.6, 0.8, 1]; // the lagging strand's Okazaki fragments, each made away from the fork
+      const lagFill = (u, t) => { const f = fork(t); if (u < f) return false; for (let j = 0; j < 5; j++) { const a = LB[j], b = LB[j + 1]; if (u < a || u > b) continue; const st = T.unzip + (1 - b) * (T.unzipEnd - T.unzip) + 0.05, p = seg(t, st, st + 0.2), gap = t < T.ligase ? 0.018 : 0; return u >= a + gap && u <= lerp(a + gap, b - gap, p); } return false; };
+      const lead = (u, t) => u >= fork(t) + 0.05;
+      const OLD0 = () => "#1ec8c8", OLD1 = () => "#a83ce6", NEW = () => "#ffd36b";
+      const heads = [];
+      const head = (g, x, y, ang, open, sc) => { // a serpent head on the end of its body, upright whichever way it faces
+        const Hm = M.heads, f = open ? 1 : 0, [ox, oy, w, h] = Hm.frames[f], cw = Hm.cell[0], nk = [[12, 185], [14, 180]][f], px = 0.78 * VIEW.S * sc / 170;
+        g.save(); g.translate(x, y); g.rotate(ang); if (Math.cos(ang) < 0) g.scale(1, -1); g.scale(px, px); g.imageSmoothingEnabled = true;
+        g.drawImage(IM.heads, f * cw, 0, cw, Hm.cell[1], -nk[0] + 4, -nk[1], cw, Hm.cell[1]); g.restore();
+      };
+      const enz = (g, f, x, y, size, ang = 0) => domCentered(g, IM.enzymes, M.enzymes, f, VIEW.sx(x), VIEW.sy(y), VIEW.S * size / M.enzymes.frames[f][2], { rot: ang });
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.unzip - 0.12, 2], [T.strike - 0.1, 3], [T.down + 0.3, 0]],
+        camera(t) {
+          if (t < T.strike) { const k = ss(t, D.expand, D.expand + 0.7); return { x: lerp(att.x + s * 0.25, mid - s * 0.6, k), S: lerp(150, 86, k) }; }
+          const k = ss(t, T.strike, T.strike + 0.4); return { x: lerp(mid - s * 0.6, mid + s * 0.2, k), S: lerp(86, 94, k) + 9 * spring(t - T.fin - 0.14, 6, 18) * (t > T.fin + 0.14 ? 1 : 0) };
+        },
+        step(t) {
+          if (c.once("rise", T.rise)) { game.sfx("roar"); VIEW.shake = 0.4; }
+          if (c.once("unzip", T.unzip)) { game.sfx("cut"); VIEW.shake = 0.3; }
+          if (t > T.unzip && t < T.unzipEnd && Math.random() < 0.3) game.sfx("zap");
+          [0, 1, 2, 3, 4].forEach((j) => { const st = T.unzip + (1 - LB[j + 1]) * (T.unzipEnd - T.unzip) + 0.05; if (c.once("ok" + j, st)) game.sfx("select"); });
+          if (c.once("ligase", T.ligase)) { game.sfx("ding"); VIEW.flash = 0.04; }
+          if (c.once("copies", T.copies)) { game.sfx("domain"); }
+          T.bites.forEach((tb, i) => { if (c.once("bite" + i, tb + 0.12)) { c.freeze = 0.06; VIEW.shake = 0.45; game.sfx("impact"); game.sfx("roar"); def.flash = 0.12; P.hit(V3(def.x, i === 1 ? 0.9 : 1.5, 0), i === 1 ? "#a83ce6" : "#1ec8c8", 1.3); } });
+          if (c.once("fin", T.fin + 0.14)) { c.freeze = 0.13; VIEW.impact = 0.16; VIEW.shake = 0.9; FX2D.cx = VIEW.sx(def.x) / VIEW_W; FX2D.cy = VIEW.sy(1.3) / VIEW_H; game.sfx("boom"); game.sfx("roar"); def.flash = 0.2; for (let q = 0; q < 22; q++) { const a = Math.random() * TAU, v = 4 + Math.random() * 7; P.spark(V3(def.x, 1.3, 0), q % 2 ? "#ffd36b" : "#3c8cff", 0.13, V3(Math.cos(a) * v, Math.sin(a) * v, 0), 0.45); } }
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(def.x + s * 0.6, 8); }
+        },
+        drawDef(g, t) {
+          if (t < T.bites[0] + 0.12) return X.drawDefIdle(g, t);
+          const fl = def.flash;
+          if (t < T.fin + 0.14) { const n = T.bites.filter((b) => t >= b + 0.12).length; return defPose(g, def, n === 2 ? "hitBody" : t > T.bites[2] + 0.3 ? "dizzy" : "hitHigh", def.x, 0, { flash: fl }); }
+          if (t < T.down) { const u = seg(t, T.fin + 0.14, T.down); return defPose(g, def, "launch", def.x + s * 0.6 * u, Math.sin(u * Math.PI) * 0.6, { flash: fl, rot: s * u * 0.4 }); }
+          const u = t - T.down; defPose(g, def, "down", def.x + s * 0.6, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.15 * spring(u, 8, 20)) });
+        },
+        drawBack(g, t) {
+          if (t < T.rise) return;
+          // the root: a glowing pool on the floor the serpents rise from
+          const a = Math.min(1, (t - T.rise) / 0.2) * (1 - seg(t, D.shatter - 0.3, D.shatter)), rx = VIEW.sx(B0[0]);
+          g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = a; const gl = g.createRadialGradient(rx, FLOOR_Y, 0, rx, FLOOR_Y, VIEW.S); gl.addColorStop(0, "rgba(120,160,255,.7)"); gl.addColorStop(1, "rgba(120,160,255,0)"); g.fillStyle = gl; g.beginPath(); g.ellipse(rx, FLOOR_Y, VIEW.S, VIEW.S * 0.2, 0, 0, TAU); g.fill(); g.restore();
+          const out = 1 - seg(t, D.shatter - 0.25, D.shatter), gr = grow(t), f = fork(t), split = t >= T.unzip;
+          const al = out; if (al <= 0) return;
+          // serpent B (the copy that keeps the purple strand) and serpent A (keeps the teal strand)
+          const cA = curve(0, t), cB = curve(1, t), part = (cv) => (u) => cv(u * gr);
+          if (split) drawHelixPath(g, part(cB), { alpha: al, show0: (u) => u >= f && lagFill(u, t), show1: (u) => u >= f, col0: NEW, col1: OLD1 });
+          const eA = drawHelixPath(g, part(cA), { alpha: al, show0: () => true, show1: (u) => u < f || lead(u, t), col0: OLD0, col1: (u) => (u < f ? "#a83ce6" : "#ffd36b") });
+          heads.length = 0; heads.push(eA);
+          if (split && f < 0.985) { const pB = cB(1), dB = cB(0.99); heads.push([VIEW.sx(pB[0]), VIEW.sy(pB[1]), Math.atan2(-(pB[1] - dB[1]), pB[0] - dB[0])]); }
+          const open = (k) => (k ? bite(t, T.bites[1]) : Math.max(bite(t, T.bites[0]), bite(t, T.bites[2]))) > 0.2 || (t > T.fin - 0.05 && t < T.fin + 0.6) || (t > T.rise && t < T.rise + 0.5);
+          heads.forEach(([x, y, ang], k) => head(g, x, y, ang, open(k), 1));
+          // the enzymes: helicase opens the fork, a polymerase on each strand builds the new partner
+          if (t > T.unzip - 0.15 && t < T.unzipEnd + 0.25) {
+            const ea = Math.min(1, (t - T.unzip + 0.15) / 0.15) * (1 - seg(t, T.unzipEnd, T.unzipEnd + 0.25)), sp = bez(...single), p = sp(Math.max(0.02, f)), q = sp(Math.max(0, f - 0.01));
+            g.save(); g.globalAlpha = ea; enz(g, 0, p[0], p[1], 0.75, Math.atan2(-(p[1] - q[1]), p[0] - q[0])); g.restore();
+            const pa = cA(Math.min(1, f + 0.05)); g.save(); g.globalAlpha = ea; enz(g, 1, pa[0], pa[1] + 0.05, 0.6); g.restore();
+            let lj = 0; for (let j = 0; j < 5; j++) if (f <= LB[j + 1]) lj = j; const st = T.unzip + (1 - LB[lj + 1]) * (T.unzipEnd - T.unzip) + 0.05, pr = seg(t, st, st + 0.2), pb = cB(Math.min(1, lerp(LB[lj] + 0.02, LB[lj + 1] - 0.02, pr)));
+            g.save(); g.globalAlpha = ea; enz(g, 1, pb[0], pb[1] - 0.05, 0.6, Math.PI); g.restore();
+          }
+          if (t > T.ligase - 0.05 && t < T.ligase + 0.4) for (let j = 1; j < 5; j++) { // ligase seals the gaps between fragments
+            const p = cB(LB[j]), u = seg(t, T.ligase - 0.05, T.ligase + 0.4); g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = 1 - u; g.fillStyle = "#ffffff"; g.beginPath(); g.arc(VIEW.sx(p[0]), VIEW.sy(p[1]), 10 + 20 * u, 0, TAU); g.fill(); g.restore();
+          }
+        },
+        drawDef2: null,
+        drawProps(g, t) {},
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          pop("UNZIP!", T.unzip, VIEW.sx(mid), VIEW.sy(3.4), 58, "#ffd36b", -0.08, 0.55);
+          pop("LIGASE!", T.ligase, VIEW.sx(mid - s * 0.6), VIEW.sy(0.5), 40, "#ffffff", 0.08, 0.45);
+          pop("2 IDENTICAL COPIES!", T.copies, VIEW.sx(mid), VIEW.sy(3.55), 44, "#ffd36b", -0.05, 0.6);
+          pop("TWIN STRIKE!", T.fin + 0.14, VIEW.sx(def.x), VIEW.sy(2.6), 60, "#3c8cff", -0.06, 0.7);
+          const lab = (txt, x, y, col, a) => { g.save(); g.globalAlpha = a; g.font = "12px P2, monospace"; g.textAlign = "center"; g.lineWidth = 5; g.strokeStyle = "#140a24"; g.strokeText(txt, VIEW.sx(x), VIEW.sy(y)); g.fillStyle = col; g.fillText(txt, VIEW.sx(x), VIEW.sy(y)); g.restore(); };
+          if (t > T.unzip + 0.25 && t < T.copies) { const a = Math.min(1, (t - T.unzip - 0.25) / 0.2) * (1 - seg(t, T.copies - 0.2, T.copies)), pa = curve(0, t)(0.55), pb = curve(1, t)(0.55);
+            lab("LEADING STRAND", pa[0], pa[1] + 0.55, "#ffd36b", a); lab("LAGGING: OKAZAKI FRAGMENTS", pb[0], pb[1] - 0.55, "#ffd36b", a); }
+          if (t > T.copies && t < T.strike + 0.3) { const a = Math.min(1, (t - T.copies) / 0.2) * (1 - seg(t, T.strike, T.strike + 0.3)), pa = curve(0, t)(0.45), pb = curve(1, t)(0.45);
+            lab("1 OLD + 1 NEW", pa[0], pa[1] + 0.55, "#ffffff", a); lab("1 OLD + 1 NEW", pb[0], pb[1] - 0.5, "#ffffff", a); }
         },
       };
     },

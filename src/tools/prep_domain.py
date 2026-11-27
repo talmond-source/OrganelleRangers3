@@ -68,6 +68,12 @@ Motor Protein Puller (cytoplasm):
   poses.png   2 x 2 Cytoplasm Ranger poses: hand sign (fingers interlaced), expansion, raise the tide, pull apart
   motors.png  2 x 2: kinesin mid-stride, kinesin planted, dynein mid-stride, dynein planted (walking right, feet on
               the bottom line). The gel and the microtubule are drawn in code
+
+Infinite Translation (ribosome):
+  bg.png      inside a giant ribosome: rRNA hairpin walls, three docking alcoves (E, P, A sites), the exit tunnel
+  poses.png   2 x 2 Ribosome Ranger poses: hand sign (cupped hands, a gap between), expansion, reading, fold
+  props.png   2 x 2: ribosome (large subunit over small, a gap for the mRNA), tRNA with its amino acid, empty tRNA,
+              folded protein (blue to red, start to end). The mRNA, codons, anticodons and chain are drawn in code
 """
 import os, sys, json
 import numpy as np
@@ -275,6 +281,22 @@ def cytoplasm(meta):
     meta['cytoplasm'] = m
 
 
+def ribosome(meta):
+    src, dst = os.path.join(SRC, 'ribosome'), os.path.join(DST, 'ribosome'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 790}
+    m['poses'] = ranger_poses(src, dst)
+    cc = [clean_white(c, keep_all=True) for c in cells(os.path.join(src, 'props.png'), 2, 2)]
+    p = cc[3]; rgb = p[..., :3].astype(int); trapped = (rgb.min(-1) >= 225) & (rgb.max(-1) - rgb.min(-1) < 25); p[trapped, 3] = 0  # white caught inside the protein's loops
+    b0 = bbox(cc[0]); sheet, info = strip(cc, 240 / (b0[2] - b0[0] + 1)); sheet.save(os.path.join(dst, 'props.png'), optimize=True); m['props'] = info
+    # the gap between the subunits in the ribosome frame (strip pixels, from the frame's top): the emptiest row band
+    a = np.array(sheet)[..., 3][:, :info['cell'][0]]; ox, oy, w, h = info['frames'][0]
+    rows = (a[oy:oy + h, ox + w // 4: ox + 3 * w // 4] > 0).mean(1); mid = range(h // 3, 5 * h // 6)
+    g = min(mid, key=lambda y: rows[y]); m['gap'] = round(g / h, 3)
+    meta['ribosome'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -287,6 +309,7 @@ def main():
     mitosis(meta)
     phage(meta)
     cytoplasm(meta)
+    ribosome(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

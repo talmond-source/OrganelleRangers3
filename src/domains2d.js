@@ -1140,6 +1140,116 @@ const DOMAINS = {
       };
     },
   },
+
+  /* ---------- Ribosome: Infinite Translation. The ribosome reads the mRNA codon by codon, tRNAs deliver amino acids, the chain lashes out, then folds ---------- */
+  ribosome: {
+    name: "INFINITE TRANSLATION", col: "#ff4a4a", gold: "#ffd36b", mote: "#ffb070", dur: 7.4, shatter: 6.6, pull: 6.35, dim: 0.14,
+    glow: [836, 70, 180, "#ffcf6a"],
+    mv: { knock: [3, 6] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const CODONS = ["AUG", "GGC", "UCA", "AAG", "UGG", "UUU", "GAA", "UAA"], AA = ["Met", "Gly", "Ser", "Lys", "Trp", "Phe", "Glu"];
+      const T = { read: 1.5, unroll: 1.55, clamp: 1.95, start: 2.2, gap: 0.36, stop: 4.78, coil: 4.9, fold: 5.3, slam: 5.55, down: 5.7 };
+      const PR = M.props, mY = 0.75, cw = 0.56, x0 = att.x + s * 0.45, codonX = (k) => x0 + s * (k + 0.5) * cw, endX = codonX(7) + s * cw * 0.5;
+      const tAt = (i) => T.start + i * T.gap, added = (t) => [0, 1, 2, 3, 4, 5, 6].filter((i) => t >= tAt(i) + 0.12).length;
+      const ribK = (t) => { let k = 0; for (let i = 0; i < 7; i++) k += easeOut(seg(t, tAt(i) + 0.2, tAt(i) + 0.33)); return k; }; // codons moved so far
+      const RW = 1.2, rpx = () => VIEW.S * RW / PR.frames[0][2], rH = () => PR.frames[0][3] * rpx() / VIEW.S;
+      const ribX = (t) => codonX(ribK(t)), ribY = () => mY - rH() * PR.frames[0][3] / PR.frames[0][3] * (1 - M.gap); // the frame's bottom, so the gap sits on the mRNA
+      const tunnel = (t) => [ribX(t) - s * 0.15, mY + rH() * M.gap - 0.05];
+      const [bx, top] = defBox(def, "idle"), chest = [def.x + bx, top * 0.68];
+      const beadCol = (j) => `hsl(${(235 - j * 39) | 0},85%,55%)`; // blue at the start (Met) to red at the end, like the folded protein
+      const lash = (t) => { let p = 0; for (let i = 0; i < 7; i++) { const u = (t - tAt(i) - 0.12) / 0.3; if (u > 0 && u < 1) p = Math.max(p, u < 0.35 ? easeOut(u / 0.35) : 1 - easeIn((u - 0.35) / 0.65)); } return p; };
+      const chainPts = (t, n) => { // the chain leaves the exit tunnel and whips at the opponent
+        const [tx, ty] = tunnel(t), cap = (FLOOR_Y - 120) / VIEW.S, rest = [tx + s * (0.3 + 0.14 * n), Math.min(cap, ty + 0.55 + 0.08 * n)], hit = chest, L = lash(t), e = [lerp(rest[0], hit[0], L), lerp(rest[1], hit[1], L)];
+        const C = bez([tx, ty], [tx, Math.min(cap, ty + 0.5)], [lerp(tx, e[0], 0.5), Math.min(cap, Math.max(ty + 0.45, e[1] + 0.5))], e), pts = [];
+        for (let j = 0; j < n; j++) pts.push(C(n === 1 ? 1 : 0.25 + 0.75 * j / (n - 1)));
+        return pts.reverse(); // the first amino acid (Met) is at the far end of the chain
+      };
+      const coilPts = (t) => Array.from({ length: 7 }, (_, j) => { const a = j * 0.9 + t * 7; return [chest[0] + Math.cos(a) * 0.55, 0.35 + j * 0.27, Math.sin(a)]; });
+      const lab = (g, txt, x, y, col, size = 14) => { g.font = `${size}px P2, monospace`; g.textAlign = "center"; g.lineWidth = 5; g.strokeStyle = "#1a0b2e"; g.strokeText(txt, x, y); g.fillStyle = col; g.fillText(txt, x, y); };
+      const BASE_COL = { A: "#ff6b6b", U: "#ffd36b", G: "#7dff8a", C: "#ffb04a" };
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.read, 2], [T.fold - 0.08, 3], [T.down + 0.2, 1]],
+        camera(t) {
+          if (t < T.start) { const k = ss(t, D.expand, D.expand + 0.7); return { x: lerp(att.x + s * 0.25, mid, k), S: lerp(150, 104, k) }; }
+          if (t < T.stop) { const k = ss(t, T.start, T.start + 0.3); return { x: lerp(mid, (ribX(t) + chest[0]) / 2, k), S: lerp(104, 112, k) }; }
+          const k = ss(t, T.stop, T.coil + 0.2); return { x: lerp((ribX(T.stop) + chest[0]) / 2, chest[0] - s * 0.6, k), S: lerp(112, 118, k) + 9 * spring(t - T.slam, 6, 18) * (t > T.slam ? 1 : 0) };
+        },
+        step(t) {
+          if (c.once("unroll", T.unroll)) game.sfx("whoosh");
+          if (c.once("clamp", T.clamp)) { game.sfx("block"); VIEW.shake = 0.25; }
+          for (let i = 0; i < 7; i++) {
+            if (c.once("in" + i, tAt(i) - 0.18)) game.sfx("zap");
+            if (c.once("pair" + i, tAt(i))) game.sfx("select");
+            if (c.once("hit" + i, tAt(i) + 0.22)) { c.freeze = 0.04; VIEW.shake = 0.25 + i * 0.04; game.sfx(i === 6 ? "heavy" : "impact"); def.flash = 0.1; P.hit(V3(chest[0], chest[1], 0), beadCol(i), 1); }
+          }
+          if (c.once("stop", T.stop)) { game.sfx("ding"); VIEW.flash = 0.04; }
+          if (c.once("coil", T.coil)) game.sfx("whoosh");
+          if (c.once("fold", T.fold)) { game.sfx("charge"); VIEW.flash = 0.05; }
+          if (c.once("slam", T.slam)) { c.freeze = 0.13; VIEW.impact = 0.16; VIEW.shake = 0.9; FX2D.cx = VIEW.sx(chest[0]) / VIEW_W; FX2D.cy = VIEW.sy(1.0) / VIEW_H; game.sfx("boom"); game.sfx("impact"); def.flash = 0.2; X.grit(chest[0], 12); }
+          if (c.once("down", T.down)) game.sfx("land");
+        },
+        drawDef(g, t) {
+          if (t < tAt(0) + 0.22) return X.drawDefIdle(g, t);
+          const fl = def.flash;
+          if (t < T.coil) { const n = [0, 1, 2, 3, 4, 5, 6].filter((i) => t >= tAt(i) + 0.22).length; return defPose(g, def, n % 2 ? "hitHigh" : "hitBody", def.x, 0, { flash: fl }); }
+          if (t < T.slam) return defPose(g, def, "dizzy", def.x, 0, { flash: fl, squash: t > T.fold ? 1 - 0.06 * Math.sin(t * 30) : 1 });
+          const u = t - T.slam; defPose(g, def, "down", def.x, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.25 * spring(u, 8, 20)), flash: fl });
+        },
+        drawProps(g, t) {
+          // the mRNA tape, 5' to 3', with its codons; the ribosome reads it 3 letters at a time
+          if (t >= T.unroll && t < T.coil + 0.3) {
+            const a = 1 - seg(t, T.coil, T.coil + 0.3), un = easeOut(seg(t, T.unroll, T.unroll + 0.4)), xs = x0 - s * 0.3, xe = lerp(xs, endX + s * 0.3, un);
+            const ya = VIEW.sy(mY); g.save(); g.globalAlpha = a; g.strokeStyle = "#1a0b2e"; g.lineWidth = 12; g.beginPath(); g.moveTo(VIEW.sx(xs), ya); g.lineTo(VIEW.sx(xe), ya); g.stroke(); g.strokeStyle = "#c98bff"; g.lineWidth = 7; g.stroke();
+            lab(g, "5'", VIEW.sx(xs) - s * 18, ya + 5, "#ffffff"); if (un > 0.98) lab(g, "3'", VIEW.sx(xe) + s * 18, ya + 5, "#ffffff");
+            const kNow = Math.round(ribK(t));
+            for (let k = 0; k < 8; k++) { const cx0 = codonX(k); if (s * (cx0 - xe) > 0) continue;
+              for (let q = 0; q < 3; q++) { const lx = VIEW.sx(cx0 + s * (q - 1) * cw / 3), b = CODONS[k][q]; g.fillStyle = BASE_COL[b]; g.fillRect(lx - 3, ya, 6, 12); lab(g, b, lx, ya + 28, BASE_COL[b], 13); }
+              if (k === kNow && t >= T.start - 0.1 && t < T.stop + 0.4) { const bx0 = VIEW.sx(cx0 - s * cw / 2), bx1 = VIEW.sx(cx0 + s * cw / 2); g.strokeStyle = k === 7 ? "#ff3355" : "#ffffff"; g.lineWidth = 3; g.strokeRect(Math.min(bx0, bx1), ya - 6, Math.abs(bx1 - bx0), 42); }
+            }
+            g.restore();
+          }
+          // the ribosome clamps onto the mRNA and walks along it, 5' to 3'
+          if (t >= T.clamp - 0.2 && t < T.coil + 0.3) {
+            const a = Math.min(1, (t - T.clamp + 0.2) / 0.2) * (1 - seg(t, T.coil, T.coil + 0.3)), drop = (1 - easeOut(seg(t, T.clamp - 0.2, T.clamp))) * 3;
+            const px = rpx(), fr = PR.frames[0], cx = VIEW.sx(ribX(t)), cyc = VIEW.sy(mY) - (0.5 - M.gap) * fr[3] * px * -1 - drop * VIEW.S;
+            g.save(); g.globalAlpha = a * 0.92; domCentered(g, IM.props, PR, 0, cx, VIEW.sy(mY) - (M.gap - 0.5) * fr[3] * px - drop * VIEW.S, px, { ky: 1 + 0.05 * spring(t - T.clamp, 9, 30) }); g.restore();
+          }
+          // tRNAs: each brings its amino acid, pairs its anticodon with the codon, hands over the amino acid and leaves
+          for (let i = 0; i < 7; i++) {
+            const t0 = tAt(i); if (t < t0 - 0.2 || t > t0 + 0.5) continue;
+            const k = Math.min(1, easeOut(seg(t, t0 - 0.2, t0))), out = easeIn(seg(t, t0 + 0.2, t0 + 0.5)), f = t < t0 + 0.12 ? 1 : 2, fr = PR.frames[f], h = 1.05, px = VIEW.S * h / PR.frames[1][3];
+            const cxw = codonX(i) + s * 0.08, x = cxw - s * (1 - k) * -2.5 + s * out * 1.5, loopY = mY + 0.28, y = loopY + h / 2 - 0.05 + (1 - k) * 2 + out * 2;
+            g.save(); g.globalAlpha = 1 - out; domCentered(g, IM.props, PR, f, VIEW.sx(x), VIEW.sy(y), px * (f === 2 ? PR.frames[1][3] / fr[3] * 0.98 : 1), { kx: s }); g.restore();
+            if (k >= 1 && out < 0.6) { const ac = CODONS[i].split("").map((b) => RNA_COMP[b]); for (let q = 0; q < 3; q++) { const lx = VIEW.sx(codonX(i) + s * (q - 1) * cw / 3), ya = VIEW.sy(mY); g.save(); g.globalAlpha = 1 - out / 0.6; g.strokeStyle = "#ffffff"; g.lineWidth = 2; g.beginPath(); g.moveTo(lx, ya - 4); g.lineTo(lx, ya - 16); g.stroke(); lab(g, ac[q], lx, ya - 22, BASE_COL[ac[q]], 13); g.restore(); } }
+          }
+          // the growing chain: one bead per amino acid, coloured blue (first) to red (last)
+          const n = added(t);
+          if (n > 0 && t < T.fold + 0.25) {
+            let pts;
+            if (t < T.stop) pts = chainPts(t, n);
+            else { const a = chainPts(T.stop, 7), b = coilPts(t), k = easeOut(seg(t, T.stop + 0.05, T.coil + 0.25)), f = easeIn(seg(t, T.fold, T.fold + 0.25)); pts = a.map((p, j) => [lerp(lerp(p[0], b[j][0], k), chest[0], f), lerp(lerp(p[1], b[j][1], k), 1.2, f)]); }
+            g.save(); g.strokeStyle = "#1a0b2e"; g.lineWidth = 5; g.beginPath(); pts.forEach(([x, y], j) => (j ? g.lineTo(VIEW.sx(x), VIEW.sy(y)) : g.moveTo(VIEW.sx(x), VIEW.sy(y)))); if (t < T.stop) { const [tx, ty] = tunnel(t); g.lineTo(VIEW.sx(tx), VIEW.sy(ty)); } g.stroke(); g.restore();
+            pts.forEach(([x, y], j) => { const r = 0.12 * VIEW.S; g.save(); g.fillStyle = beadCol(j); g.strokeStyle = "#1a0b2e"; g.lineWidth = 3; g.beginPath(); g.arc(VIEW.sx(x), VIEW.sy(y), r, 0, TAU); g.fill(); g.stroke(); g.fillStyle = "rgba(255,255,255,.55)"; g.beginPath(); g.arc(VIEW.sx(x) - r * 0.3, VIEW.sy(y) - r * 0.35, r * 0.3, 0, TAU); g.fill(); g.restore(); });
+          }
+          // FOLD: the chain becomes the folded protein, which slams down on the opponent
+          if (t >= T.fold && t < T.slam + 0.5) {
+            const k = backOut(seg(t, T.fold, T.fold + 0.25)), u = seg(t, T.fold + 0.1, T.slam), y = t < T.slam ? lerp(1.2, 2.9, easeOut(Math.min(1, u * 2))) - (u > 0.5 ? easeIn((u - 0.5) * 2) * 1.9 : 0) : 1.0, a = 1 - seg(t, T.slam + 0.2, T.slam + 0.5);
+            const fr = PR.frames[3], px = VIEW.S * 1.7 / fr[2], sq = t > T.slam ? 1 - 0.3 * spring(t - T.slam, 8, 24) : 1;
+            domCentered(g, IM.props, PR, 3, VIEW.sx(chest[0]), VIEW.sy(y), px * Math.max(0.05, k), { rot: (t - T.fold) * 3 * s, alpha: a, ky: sq, kx: 2 - sq });
+          }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          pop("START: AUG", T.start - 0.05, VIEW.sx(codonX(0)), Math.max(110, VIEW.sy(2.8)), 44, "#7dff8a", -0.05, 0.5);
+          for (let i = 0; i < 7; i++) pop(AA[i] + "!", tAt(i) + 0.22, VIEW.sx(chest[0] + s * 0.9), Math.max(110, VIEW.sy(2.3 + (i % 2) * 0.3)), 40 + i * 3, beadCol(i), i % 2 ? 0.1 : -0.1, 0.32);
+          pop("STOP: UAA", T.stop, VIEW.sx(codonX(7)), Math.max(110, VIEW.sy(2.8)), 48, "#ff3355", 0.05, 0.55);
+          pop("FOLD!", T.fold, VIEW.sx(chest[0]), Math.max(110, VIEW.sy(3.2)), 64, "#ffd36b", -0.06, 0.5);
+          if (t > T.start + 0.1 && t < T.stop) { const txt = "CODON " + (Math.round(ribK(t)) + 1) + ": " + CODONS[Math.round(ribK(t))] + " → " + (AA[Math.round(ribK(t))] || "STOP"); g.save(); lab(g, txt, VIEW.sx(ribX(t)), VIEW.sy(mY) + 58, "#ffffff", 14); g.restore(); }
+        },
+      };
+    },
+  },
 };
 
 function domainCine(game, att, def) {

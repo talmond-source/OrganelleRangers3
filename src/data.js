@@ -35,7 +35,7 @@ const MOVES = {
       { dir: "fwd", name: "Polypeptide Lash", desc: "Amino-acid whip. Gets longer every time it hits (up to 4 links).", bio: "The ribosome adds one amino acid at a time; a protein can be thousands long." },
       { dir: "down", name: "Codon Combo", desc: "Rush combo that starts on AUG and ends on a STOP codon.", bio: "Translation starts at AUG (methionine) and ends at a stop codon: UAA, UAG or UGA." },
     ],
-    ult: { name: "Amino Acid Constrictor", bio: "A new protein leaves the ribosome as a long chain of amino acids joined by peptide bonds, then folds into its working shape." },
+    ult: { name: "Infinite Translation", bio: "The ribosome reads mRNA from 5' to 3', one codon (3 letters) at a time. Each tRNA pairs its anticodon with a codon and adds its amino acid. A stop codon (UAA) ends the chain, which folds into a working protein." },
   },
 };
 

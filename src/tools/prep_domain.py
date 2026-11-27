@@ -56,6 +56,12 @@ Cellular Craze (mitosis):
               (knuckles together), expansion, pull apart, karate chop. Cut with clean_key (blue)
   props.png   2 x 2: pink X chromosome, green X chromosome, one chromatid, a centrosome (two centrioles at right
               angles). In anaphase the game splits each X down the middle into its two sister chromatids
+
+Lytic Hive (phage, the boss):
+  bg.png      inside a hijacked bacterium: walls of empty phage heads like honeycomb, chopped host DNA
+  poses.png   2 x 2 Phage Ranger poses: hand sign (triangle), expansion, command, boss finish. keep_all, so the six
+              tail fibres survive even where they don't touch the body
+  props.png   2 x 2 T4 phage: whole (sheath extended), injecting (sheath contracted), head only, tail only
 """
 import os, sys, json
 import numpy as np
@@ -151,9 +157,9 @@ def clean_key(rgba, ch=1):
     return out
 
 
-def ranger_poses(src, dst, key=None):
+def ranger_poses(src, dst, key=None, keep_all=False):
     """2 x 2 Ranger domain poses; the standing hand sign (pose 1) is drawn 12% taller than the fighting stance"""
-    pc = [(clean_key(c, key) if key else clean_white(c)) for c in cells(os.path.join(src, 'poses.png'), 2, 2)]
+    pc = [(clean_key(c, key) if key else clean_white(c, keep_all=keep_all)) for c in cells(os.path.join(src, 'poses.png'), 2, 2)]
     b0 = bbox(pc[0]); sheet, info = strip(pc, 200 * 1.12 / (b0[3] - b0[1] + 1))
     sheet.save(os.path.join(dst, 'poses.png'), optimize=True); return info
 
@@ -241,6 +247,17 @@ def mitosis(meta):
     meta['mitosis'] = m
 
 
+def phage(meta):
+    src, dst = os.path.join(SRC, 'phage'), os.path.join(DST, 'phage'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 790}
+    m['poses'] = ranger_poses(src, dst, keep_all=True)
+    cc = [clean_white(c, keep_all=True) for c in cells(os.path.join(src, 'props.png'), 2, 2)]
+    b0 = bbox(cc[0]); sheet, info = strip(cc, 200 / (b0[3] - b0[1] + 1)); sheet.save(os.path.join(dst, 'props.png'), optimize=True); m['props'] = info
+    meta['phage'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -251,6 +268,7 @@ def main():
     mito(meta)
     dna(meta)
     mitosis(meta)
+    phage(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

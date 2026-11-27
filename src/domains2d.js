@@ -65,7 +65,7 @@ function defBox(def, key) {
 function defMorph(g, def, key, x, y, o = {}) {
   const cx = VIEW.sx(x), cy = VIEW.sy(y + (o.cy ?? 0.9)); g.save(); g.translate(cx, cy); if (o.rot) g.rotate(o.rot);
   if (o.skew) g.transform(1, 0, o.skew, 1, 0, 0); g.scale(o.kx ?? 1, o.ky ?? 1); g.translate(-cx, -cy);
-  defPose(g, def, key, x, y, { flash: o.flash, alpha: o.alpha }); g.restore();
+  defPose(g, def, key, x, y, { flash: o.flash, alpha: o.alpha, silhouette: o.silhouette }); g.restore();
 }
 /* A horizontal stretch of DNA drawn in code, so the base pairs and the twist are always right:
    a RIGHT-handed double helix (the strand in front always slopes down to the right), about 10.5 base pairs per turn,
@@ -965,6 +965,89 @@ const DOMAINS = {
           [T.pop, ...T.dbl].forEach((td, i) => pop("×" + (2 << i), td + 0.02, VIEW.sx(def.x) + (i % 2 ? 1 : -1) * 120, VIEW.sy(2.1 + i * 0.25), 44 + i * 8, i === 3 ? "#ff3fa4" : "#5dff7a", i % 2 ? 0.1 : -0.1, 0.3));
           pop("CELLULAR CRAZE!", T.pile + 0.05, VIEW.sx(def.x), VIEW.sy(2.9), 58, "#ff3fa4", -0.05, 0.6);
           pop("CHOP!", T.chop, VIEW.sx(def.x + s * 1.1), VIEW.sy(2.3), 64, "#ffffff", 0.1, 0.5);
+        },
+      };
+    },
+  },
+
+  /* ---------- Phage (boss): Lytic Hive. Phages land, inject their DNA, hijack the opponent into a phage factory, and burst out (lysis) ---------- */
+  phage: {
+    name: "LYTIC HIVE", col: "#9dff5a", gold: "#d8ff6a", mote: "#c8ff8a", dur: 7.1, shatter: 6.3, pull: 6.05, dim: 0.06,
+    glow: [836, 300, 380, "#7dff5a"],
+    mv: { knock: [4, 7] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { cmd: 1.45, rain: 1.55, land: 2.0, inject: 2.4, hijack: 2.8, build: 2.95, lysis: 4.75, down: 5.25, boss: 4.85 };
+      const PR = M.props, rnd = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+      const [bx, top, bw] = defBox(def, "idle"), cx = def.x + bx, cy = top * 0.55;
+      const N = 8, spots = Array.from({ length: N }, (_, i) => [cx + (rnd(i, 1) - 0.5) * bw * 0.7, 0.45 + rnd(i, 2) * (top - 0.85), (rnd(i, 3) - 0.5) * 0.9]);
+      const phpx = (h) => VIEW.S * h / PR.frames[0][3];
+      const lander = (g, f, x, y, h, rot, a = 1) => domCentered(g, IM.props, PR, f, VIEW.sx(x), VIEW.sy(y), phpx(h) * (f === 2 ? 0.62 : 1), { rot, alpha: a });
+      // the assembly line inside the host: heads and tails made separately, then joined
+      const SL = 14, slots = Array.from({ length: SL }, (_, i) => ({ x: cx + (((i % 4) + 0.5) / 4 - 0.5) * bw * 0.62 + (rnd(i, 5) - 0.5) * 0.1, y: 0.45 + (Math.floor(i / 4) + 0.5) / 4 * (top - 0.75), t: T.build + i * ((T.lysis - 0.35 - T.build) / SL) }));
+      const built = (t) => slots.filter((q) => t >= q.t + 0.3).length;
+      const BURST = 40, burst = Array.from({ length: BURST }, (_, i) => { const a = (i / BURST) * TAU + rnd(i, 7) * 0.3, v = 3 + rnd(i, 8) * 5; return { a, v, spin: (rnd(i, 9) - 0.5) * 10, h: 0.42 + rnd(i, 10) * 0.2 }; });
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.cmd, 2], [T.boss, 3]],
+        camera(t) {
+          if (t < T.hijack) { const k = ss(t, D.expand, D.expand + 0.7); return { x: lerp(att.x + s * 0.25, mid + s * 0.4, k), S: lerp(150, 100, k) }; }
+          if (t < T.lysis) { const k = ss(t, T.hijack, T.hijack + 0.4); return { x: lerp(mid + s * 0.4, cx - s * 0.4, k), S: lerp(100, 128, k) + 4 * ss(t, T.lysis - 0.6, T.lysis) }; }
+          const k = ss(t, T.lysis, T.lysis + 0.25); return { x: lerp(cx - s * 0.4, mid, k), S: lerp(132, 86, k) + 10 * spring(t - T.lysis, 6, 18) };
+        },
+        step(t) {
+          if (c.once("rain", T.rain)) game.sfx("whoosh");
+          for (let i = 0; i < N; i++) if (c.once("l" + i, T.land + i * 0.03)) { game.sfx("land"); def.flash = 0.06; }
+          if (c.once("inject", T.inject)) { game.sfx("zap"); game.sfx("charge"); VIEW.shake = 0.3; def.flash = 0.12; }
+          if (c.once("hijack", T.hijack)) { game.sfx("domain"); VIEW.flash = 0.04; }
+          slots.forEach((q, i) => { if (c.once("b" + i, q.t + 0.3)) game.sfx(i % 3 ? "select" : "ding"); });
+          if (t > T.lysis - 0.6 && t < T.lysis && Math.random() < 0.3) { VIEW.shake = 0.15; game.sfx("zap"); }
+          if (c.once("lysis", T.lysis)) { c.freeze = 0.13; VIEW.impact = 0.18; VIEW.shake = 1.0; VIEW.flash = 0.08; FX2D.cx = VIEW.sx(cx) / VIEW_W; FX2D.cy = VIEW.sy(cy) / VIEW_H; game.sfx("boom"); game.sfx("pop"); game.sfx("shatter"); def.flash = 0.25; }
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(def.x + s * 0.8, 8); }
+        },
+        drawDef(g, t) {
+          if (t < T.land) return X.drawDefIdle(g, t);
+          if (t < T.hijack) return defPose(g, def, t < T.inject ? "block" : "hitBody", def.x, 0, { flash: def.flash });
+          if (t < T.lysis) { // the host as an x-ray: a dark silhouette with a toxic glow, swelling and trembling as it fills with phages
+            const k = seg(t, T.hijack, T.lysis), sw = 1 + 0.12 * easeIn(k), tr = (Math.random() - 0.5) * 0.04 * k, mk = (o) => defMorph(g, def, "hitBody", def.x + tr, 0, Object.assign({ kx: sw, ky: sw, cy: cy }, o));
+            const a = ss(t, T.hijack, T.hijack + 0.25); mk({ flash: def.flash, alpha: 1 - a });
+            g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = a * (0.75 + 0.25 * Math.sin(t * 20)); mk({ silhouette: "#b8ff6a", kx: sw * 1.08, ky: sw * 1.05 }); mk({ silhouette: "#7dff5a", kx: sw * 1.14, ky: sw * 1.08 }); g.restore();
+            g.save(); g.globalAlpha = a * 0.9; mk({ silhouette: "#1d4a2c" }); g.restore();
+            return;
+          }
+          if (t < T.down) { const u = seg(t, T.lysis, T.down); return defPose(g, def, "launch", def.x + s * 0.8 * u, Math.sin(u * Math.PI) * 0.7, { flash: def.flash, rot: s * u * 0.4 }); }
+          const u = t - T.down; defPose(g, def, "down", def.x + s * 0.8, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.15 * spring(u, 8, 20)) });
+        },
+        drawProps(g, t) {
+          // the swarm rains down, grips with its tail fibres and injects
+          if (t >= T.rain && t < T.hijack + 0.3) for (let i = 0; i < N; i++) {
+            const [x, y, r] = spots[i], land = T.land + i * 0.03, u = easeIn(seg(t, T.rain + i * 0.03, land)), a = 1 - seg(t, T.hijack, T.hijack + 0.3);
+            const px = lerp(x - s * 1.5, x, u), py = lerp(y + 4.5, y, u), f = t >= T.inject ? 1 : 0, squ = t >= T.inject && t < T.inject + 0.12 ? 0.85 : 1;
+            lander(g, f, px, py + 0.28, 0.62 * squ, r + (1 - u) * -s * 0.6, a);
+          }
+          if (t >= T.inject && t < T.hijack + 0.2) for (let i = 0; i < N; i++) { // the injected DNA snakes into the host
+            const [x, y] = spots[i], u = seg(t, T.inject, T.inject + 0.35), a = 1 - seg(t, T.hijack, T.hijack + 0.2);
+            g.save(); g.globalAlpha = a; g.globalCompositeOperation = "lighter"; g.strokeStyle = "#c8ff5a"; g.lineWidth = 3; g.beginPath();
+            for (let q = 0; q <= 12; q++) { const v = q / 12 * u, xx = lerp(x, cx, v) + Math.sin(v * 18 + i) * 0.06, yy = lerp(y, cy, v); q ? g.lineTo(VIEW.sx(xx), VIEW.sy(yy)) : g.moveTo(VIEW.sx(xx), VIEW.sy(yy)); } g.stroke(); g.restore();
+          }
+          if (t >= T.build && t < T.lysis) for (const q of slots) { // heads and tails built separately, then snapped together
+            if (t < q.t) continue; const u = seg(t, q.t, q.t + 0.3), a = Math.min(1, (t - q.t) / 0.1), h = 0.42;
+            g.save(); g.globalAlpha = a;
+            if (u < 1) { lander(g, 2, q.x - 0.18 * (1 - u), q.y + h * 0.28, h); lander(g, 3, q.x + 0.18 * (1 - u), q.y - h * 0.18, h * 0.78); }
+            else { const pop = 1 + 0.25 * spring(t - q.t - 0.3, 10, 30); lander(g, 0, q.x, q.y, h * pop); }
+            g.restore();
+          }
+          if (t >= T.lysis && t < T.lysis + 1.2) { // lysis: the new phages burst out in every direction
+            const u = t - T.lysis; g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = 1 - seg(u, 0, 0.35); g.fillStyle = "#d8ff9a"; g.beginPath(); g.arc(VIEW.sx(cx), VIEW.sy(cy), (0.5 + 4 * u) * VIEW.S, 0, TAU); g.fill(); g.restore();
+            for (const b of burst) { const d = b.v * u * (1 - 0.25 * u), a = 1 - seg(u, 0.7, 1.2); lander(g, 0, cx + Math.cos(b.a) * d, cy + Math.sin(b.a) * d * 0.8 - 0.6 * u * u, b.h, b.spin * u, a); }
+          }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          pop("ATTACH!", T.land, VIEW.sx(cx + s * 1.5), VIEW.sy(2.6), 46, "#d8ff6a", -0.06, 0.4);
+          pop("INJECT!", T.inject, VIEW.sx(cx + s * 1.5), VIEW.sy(2.4), 50, "#ffffff", 0.08, 0.4);
+          pop("HIJACKED!", T.hijack, VIEW.sx(cx), Math.max(110, VIEW.sy(top + 0.55)), 54, "#9dff5a", -0.05, 0.55);
+          if (t > T.hijack + 0.55 && t < T.lysis) { const n = Math.min(150, Math.round(built(t) / SL * 150 + seg(t, T.build, T.lysis) * 8)), txt = "PHAGES BUILT: " + n; g.save(); g.font = "16px P2, monospace"; g.textAlign = "center"; g.lineWidth = 6; g.strokeStyle = "#0c2416"; const x = VIEW.sx(cx), y = Math.max(96, VIEW.sy(top + 0.45)); g.strokeText(txt, x, y); g.fillStyle = "#d8ff6a"; g.fillText(txt, x, y); g.restore(); }
+          pop("LYSIS!", T.lysis, VIEW.sx(cx), Math.max(130, VIEW.sy(2.9)), 80, "#d8ff6a", -0.06, 0.7);
         },
       };
     },

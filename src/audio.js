@@ -49,7 +49,7 @@ const AUDIO = {
   },
   /* 90s arcade loop: driving bass, square lead, noise drums */
   startMusic(kind = "fight") {
-    if (!this.ctx || this.music) return; const c = this.ctx; const bpm = kind === "menu" ? 112 : 148, beat = 60 / bpm; let next = c.currentTime + 0.1, step = 0;
+    if (!this.ctx || this.music) return; if (kind === "menu") return this.playScore(TITLE_SCORE, 0, "menu"); const c = this.ctx; const bpm = kind === "menu" ? 112 : 148, beat = 60 / bpm; let next = c.currentTime + 0.1, step = 0;
     const bassA = [45, 45, 57, 45, 48, 48, 60, 48, 43, 43, 55, 43, 50, 50, 52, 55], lead = [69, 0, 72, 74, 0, 72, 69, 67, 69, 0, 64, 67, 0, 69, 72, 76];
     const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
     const g = c.createGain(); g.gain.value = 0.32; g.connect(this.master);
@@ -68,5 +68,24 @@ const AUDIO = {
     };
     this.music = { id: setInterval(tick, 50), g }; tick();
   },
-  stopMusic() { if (this.music) { clearInterval(this.music.id); this.music.g.disconnect(); this.music = null; } },
+  stopMusic() { if (this.music) { clearInterval(this.music.id); try { this.music.g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.03); } catch (_) {} const g = this.music.g; setTimeout(() => g.disconnect(), 200); this.music = null; } },
+  /* plays a step-sequenced score (see CHIP below) on the audio clock; offset = where in the score to start, in seconds.
+     music.base is the audio time of the score's 0, so a cutscene can read its own time off the audio clock */
+  playScore(score, offset = 0, kind = "score") {
+    if (!this.ctx) return; this.stopMusic(); const c = this.ctx, g = c.createGain(); g.gain.value = kind === "intro" ? 0.5 : 0.36; g.connect(this.master);
+    const bus = CHIP.bus(c, g), base = c.currentTime + 0.08 - offset; let done = offset;
+    const tick = () => { const until = c.currentTime - base + 0.25; if (until > done) { if (this.on) score(c, bus, base, done, until); done = until; } };
+    this.music = { id: setInterval(tick, 40), g, base, kind }; tick(); return this.music;
+  },
+  /* renders a score to a WAV (for the review recorder): same notes, no real-time clock */
+  async renderScore(score, secs) {
+    const rate = 44100, c = new OfflineAudioContext(2, Math.ceil(rate * secs), rate), g = c.createGain(); g.gain.value = 0.5 * this.vol; g.connect(c.destination);
+    score(c, CHIP.bus(c, g), 0, 0, secs); const buf = await c.startRendering();
+    const L = buf.getChannelData(0), R = buf.getChannelData(1), n = L.length, out = new DataView(new ArrayBuffer(44 + n * 4));
+    const w = (o, s) => { for (let i = 0; i < s.length; i++) out.setUint8(o + i, s.charCodeAt(i)); };
+    w(0, "RIFF"); out.setUint32(4, 36 + n * 4, true); w(8, "WAVEfmt "); out.setUint32(16, 16, true); out.setUint16(20, 1, true); out.setUint16(22, 2, true);
+    out.setUint32(24, rate, true); out.setUint32(28, rate * 4, true); out.setUint16(32, 4, true); out.setUint16(34, 16, true); w(36, "data"); out.setUint32(40, n * 4, true);
+    for (let i = 0; i < n; i++) { out.setInt16(44 + i * 4, Math.max(-1, Math.min(1, L[i])) * 32767, true); out.setInt16(46 + i * 4, Math.max(-1, Math.min(1, R[i])) * 32767, true); }
+    let bin = ""; const u8 = new Uint8Array(out.buffer); for (let i = 0; i < u8.length; i += 32768) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 32768)); return btoa(bin);
+  },
 };

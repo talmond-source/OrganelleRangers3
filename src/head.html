@@ -1,4 +1,4 @@
-<title>Organelle Rangers 3</title>
+<title>Organelle Rangers</title>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -243,4 +243,13 @@ body.touch #pad{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;a
 body.touch .mbtn{font-size:3.6cqw;padding:1.3cqw 2.4cqw 1.3cqw 2.8cqw} body.touch .mbtn small{font-size:1.9cqw} body.touch .mlist{min-width:46cqw;gap:1.1cqw}
 body.touch #selHint,body.touch .hintline{font-size:1.5cqw}
 @media (prefers-reduced-motion: reduce){ .bn-lines{animation:none} }
+
+/* the title logo: ChatGPT's ORGANELLE RANGERS art (intro/logo.webp) */
+.logo2{transform:none}
+.logo2 .lgw{position:relative;display:inline-block;width:60cqw;line-height:0;filter:drop-shadow(0 1cqw 1.6cqw rgba(0,0,0,.75))}
+.logo2 img.lg{width:100%;display:block}
+.logo2 .shine{position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(255,255,255,.7) 50%,transparent 60%);background-size:260% 100%;mix-blend-mode:overlay;animation:shine 3.2s ease-in-out infinite;-webkit-mask-size:100% 100%;mask-size:100% 100%;pointer-events:none}
+.logo2.in .lgw{animation:logoSlam .5s cubic-bezier(.2,1.4,.4,1) both}
+@keyframes logoSlam{from{transform:scale(2.4);opacity:0}to{transform:none;opacity:1}}
+.logo2.small{transform:scale(.45);transform-origin:left bottom;margin-bottom:-1cqw}
 </style>

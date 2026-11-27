@@ -1,6 +1,6 @@
 {
-  "name": "Organelle Rangers 3",
-  "short_name": "Org Rangers 3",
+  "name": "Organelle Rangers",
+  "short_name": "Org Rangers",
   "description": "A cell biology arcade fighting game (Mr. Almond).",
   "start_url": "./",
   "scope": "./",

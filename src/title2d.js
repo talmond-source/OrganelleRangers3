@@ -1,9 +1,11 @@
 /* ================= Menu backdrops: the title parade and the character-select showcase ================= */
 const INTRO = {
   phase: "logo", on: false, t: 0,
-  init() {}, show(on) { this.on = on; }, start() { this.phase = "logo"; this.t = 0; }, toLogo() { this.phase = "logo"; },
+  init() {}, show(on) { this.on = on; }, start() { this.phase = "cine"; this.natural = false; this.t = 0; CINE.start(); }, toLogo() { this.phase = "logo"; },
   update(dt) {
-    if (!this.on) return; this.t += dt; const t = this.t, g = VIEW.x;
+    if (!this.on) return;
+    if (this.phase === "cine") { if (CINE.update(dt)) { this.phase = "logo"; this.natural = true; } return; }
+    this.t += dt; const t = this.t, g = VIEW.x;
     VIEW.camX = Math.sin(t * 0.08) * 1.5; VIEW.S = 104; VIEW.setStage("environment"); VIEW.begin(dt);
     g.save(); g.fillStyle = "rgba(4,6,18,.45)"; g.fillRect(0, 0, VIEW_W, VIEW_H); g.restore();
     // the Phage looms over the city

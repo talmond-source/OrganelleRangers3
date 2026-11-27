@@ -36,8 +36,15 @@ for d in sorted(os.listdir('domain')):
             elif f.endswith('.png'):  # lossless WebP, like the fighter sprites
                 buf = io.BytesIO(); Image.open('domain/%s/%s' % (d, f)).convert('RGBA').save(buf, 'WEBP', lossless=True, method=6)
                 domains.setdefault(d, {})[f[:-4]] = 'data:image/webp;base64,' + base64.b64encode(buf.getvalue()).decode()
-data_js = 'const SPRITE_DATA = %s;\nconst SPRITE_META = %s;\nconst STAGE_DATA = %s;\nconst MEGA_DATA = %s;\nconst DOMAIN_DATA = %s;\nconst DOMAIN_META = %s;\n' % (json.dumps(sprites), json.dumps(meta), json.dumps(stages), json.dumps(megas), json.dumps(domains), open('domain/meta.json').read())
-js = "\n".join(open(f).read() for f in ['data.js', 'diagrams.js', 'molecules.js', 'core2d.js', 'pose.js', 'fx.js', 'audio.js', 'fight.js', 'gamepad.js', 'kits.js', 'kits2.js', 'megas2d.js', 'domains2d.js', 'title2d.js', 'app.js'])
+# Story intro, roll call and title logo (tools/prep_intro.py): intro/*.webp|png and intro/meta.json
+intro = {}
+for f in sorted(os.listdir('intro')):
+    if f.endswith('.webp'): intro[f[:-5]] = uri('intro/' + f, 'image/webp')
+    elif f.endswith('.png'):  # roll-call strips: high-quality lossy WebP with exact alpha
+        buf = io.BytesIO(); Image.open('intro/' + f).convert('RGBA').save(buf, 'WEBP', quality=92, alpha_quality=100, method=6)
+        intro[f[:-4]] = 'data:image/webp;base64,' + base64.b64encode(buf.getvalue()).decode()
+data_js = 'const SPRITE_DATA = %s;\nconst SPRITE_META = %s;\nconst STAGE_DATA = %s;\nconst MEGA_DATA = %s;\nconst DOMAIN_DATA = %s;\nconst DOMAIN_META = %s;\nconst INTRO_DATA = %s;\nconst INTRO_META = %s;\n' % (json.dumps(sprites), json.dumps(meta), json.dumps(stages), json.dumps(megas), json.dumps(domains), open('domain/meta.json').read(), json.dumps(intro), open('intro/meta.json').read())
+js = "\n".join(open(f).read() for f in ['data.js', 'diagrams.js', 'molecules.js', 'core2d.js', 'pose.js', 'fx.js', 'audio.js', 'music.js', 'fight.js', 'gamepad.js', 'kits.js', 'kits2.js', 'megas2d.js', 'domains2d.js', 'intro2d.js', 'title2d.js', 'app.js'])
 js += '\nAPP.init();\n'
 def esc(s):
     out = []

@@ -97,6 +97,26 @@ function drawDNA(g, x0, x1, cy, o = {}) {
   draw(seg.filter((q) => q.z >= 0)); g.restore();
   return step;
 }
+/* a domain strip frame as a flat silhouette (cached), e.g. for shadow clones */
+const _domSil = {};
+function domSil(img, M, frame, col) {
+  const k = img.src.length + ":" + frame + ":" + col; if (_domSil[k]) return _domSil[k];
+  const [cw, ch] = M.cell, cv = document.createElement("canvas"); cv.width = cw; cv.height = ch; const x = cv.getContext("2d");
+  x.drawImage(img, frame * cw, 0, cw, ch, 0, 0, cw, ch); x.globalCompositeOperation = "source-in"; x.fillStyle = col; x.fillRect(0, 0, cw, ch); return (_domSil[k] = cv);
+}
+/* a single RNA strand along a path: backbone plus one coloured base per letter (A red, U yellow, G green, C orange,
+   the same colours the DNA pairs use, so a guide lying against its target shows proper A-U / G-C pairs).
+   path(u) gives world [x, y] for u in 0..1; dir = +1 bases hang down, -1 they stand up */
+const RNA_COL = { A: "#e23430", U: "#face28", G: "#60c438", C: "#f6841c" }, RNA_COMP = { A: "U", U: "A", G: "C", C: "G" };
+function drawStrand(g, path, seq, o = {}) {
+  const S = VIEW.S, n = seq.length, L = (o.base ?? 0.16) * S, dir = o.dir || 1, w = Math.max(2, (o.w ?? 0.06) * S);
+  g.save(); g.globalAlpha = o.alpha ?? 1; g.lineCap = "round";
+  for (let i = 0; i < n; i++) { const u = (i + 0.5) / n, [x, y] = path(u), sx = VIEW.sx(x), sy = VIEW.sy(y); g.strokeStyle = "#140a24"; g.lineWidth = w * 0.7 + 3; g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx, sy + dir * L); g.stroke(); g.strokeStyle = RNA_COL[seq[i]]; g.lineWidth = w * 0.7; g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx, sy + dir * L); g.stroke(); }
+  const pts = []; for (let i = 0; i <= 40; i++) { const [x, y] = path(i / 40); pts.push([VIEW.sx(x), VIEW.sy(y)]); }
+  for (const [lw, col] of [[w + 4, "#140a24"], [w, o.col || "#c98bff"]]) { g.strokeStyle = col; g.lineWidth = lw; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); }
+  if (o.glow) { g.globalCompositeOperation = "lighter"; g.strokeStyle = rgba(o.glow, 0.5); g.lineWidth = w * 2.4; g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.stroke(); }
+  g.restore();
+}
 function comic(g, text, x, y, size, fill, k = 1, rot = -0.08) { // a pop-art sound effect word
   if (k <= 0.01) return;
   g.save(); g.translate(x, y); g.rotate(rot); g.scale(k, k); g.font = `${size}px Bangers, Impact, sans-serif`; g.textAlign = "center"; g.textBaseline = "middle";
@@ -450,6 +470,141 @@ const DOMAINS = {
       };
     },
   },
+
+  /* ---------- RNA: Silent Shadow Interference. Dicer chops double-stranded RNA into guides; shadow ninjas (RISC) slice the matching mRNA ---------- */
+  rna: {
+    name: "SILENT SHADOW INTERFERENCE", col: "#b86bff", gold: "#ffd36b", mote: "#d9a8ff", dur: 7.8, shatter: 7.0, pull: 6.75, dim: 0.08,
+    glow: [850, 125, 110, "#f0c8ff"],
+    mv: { knock: [3, 6] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { throw: 1.8, dicer: 2.15, chop: [2.45, 2.8, 3.15], seal: 3.35, mrna: 3.55, slice: [4.15, 4.55, 4.95], palm: 5.3, silent: 5.5, flurry: 5.95, vanish: 6.45, down: 6.5, pose: 6.55 };
+      const lim = (x) => clamp(x, -HALF + 0.6, HALF - 0.6), startX = att.x;
+      const ribY = 2.7, bp = 0.6 / 10.5, piece = 21 * bp, rib0 = mid - s * piece * 1.5; // the dsRNA: three 21-letter pieces long
+      const spots = [lim(def.x - s * 1.75), lim(def.x + s * 1.75), lim(def.x - s * 3.0)];
+      const land = T.chop.map((t) => t + 0.35);
+      const SEQS = ["AUGGCUAGCUUCGAGGAUCCA", "AUGCCGUUAGCAUGGCUACGU", "AUGUUCGGACAUAGCGCUAAG"], NAMES = ["mRNA: PUNCH", "mRNA: KICK", "mRNA: SPECIAL"];
+      const comp = (q) => q.split("").map((b) => RNA_COMP[b]).join("");
+      // the opponent's three mRNAs, streaming out of their chest toward the attacker like scrolls
+      const ribH = [0.75, 1.4, 2.05], ribLen = 2.3;
+      const mrnaPath = (i, t, k = 1) => (u) => { const xx = def.x - s * (0.15 + u * ribLen * k); return [xx, ribH[i] + Math.sin(u * 9 + t * 4 + i) * 0.05]; };
+      const unfurl = (t) => easeOut(seg(t, T.mrna, T.mrna + 0.4));
+      const sliceX = (i) => def.x - s * (0.15 + ribLen * 0.55);
+      const SIL = (f) => domSil(IM.poses, M.poses, f, "#1c0a30"), RIM = (f) => domSil(IM.poses, M.poses, f, "#d79bff");
+      const ppx = () => VIEW.S * FIGHTER_H / SPRITE_META.target;
+      const ninja = (g, x, f, a, face = s) => { // a shadow clone: a dark silhouette with a glowing rim and glowing eyes
+        const sx = VIEW.sx(x), sy = VIEW.sy(0), px = ppx(), PS = M.poses, [cw, ch] = PS.cell;
+        g.save(); g.globalAlpha = a; g.translate(sx, sy); g.scale(face * px, px);
+        for (const [dx, dy] of [[-5, 0], [5, 0], [0, -5], [0, 5], [-4, -4], [4, 4], [-4, 4], [4, -4]]) g.drawImage(RIM(f), -cw / 2 + dx, -PS.base + dy);
+        g.drawImage(SIL(f), -cw / 2, -PS.base);
+        const fr = PS.frames[f], ex = f === 3 ? fr[0] + fr[2] * 0.86 : fr[0] + fr[2] * 0.62, ey = f === 3 ? fr[1] + fr[3] * 0.2 : fr[1] + fr[3] * 0.075;
+        g.globalCompositeOperation = "lighter"; g.fillStyle = "#ff9cf0"; g.fillRect(ex - cw / 2 - 14, ey - PS.base - 3, 28, 7); g.fillStyle = "#ffffff"; g.fillRect(ex - cw / 2 - 9, ey - PS.base - 1, 18, 3); g.restore();
+      };
+      const guideAt = (i, t) => { // the ninja's guide strand, floating beside it
+        const x = spots[i], u = t * 3 + i; return (v) => [x - s * 0.15 + s * (v - 0.5) * 0.9, 1.75 + Math.sin(v * 8 + u) * 0.05]; };
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.throw, 2], [T.seal, 0], [T.flurry, 3], [T.pose, 0]],
+        attX: (t) => (t < T.flurry ? startX : lerp(startX, lim(startX + s * 1.2), easeOut(seg(t, T.flurry, T.flurry + 0.15)))),
+        ghosts: (t) => t > T.flurry && t < T.flurry + 0.2,
+        camera(t) {
+          if (t < T.mrna) { const k = ss(t, D.expand, D.expand + 0.7); return { x: lerp(att.x + s * 0.25, mid, k), S: lerp(150, 92, k) }; }
+          if (t < T.flurry) { const k = ss(t, T.mrna, T.mrna + 0.5); return { x: lerp(mid, def.x - s * 1.3, k), S: lerp(92, 108, k) }; }
+          const k = ss(t, T.flurry, T.flurry + 0.2); return { x: lerp(def.x - s * 1.3, def.x - s * 0.6, k), S: lerp(108, 126, k) + 6 * spring(t - T.flurry, 5, 30) };
+        },
+        step(t) {
+          if (c.once("throw", T.throw)) game.sfx("whoosh");
+          if (c.once("dicer", T.dicer)) game.sfx("charge");
+          T.chop.forEach((tc, i) => {
+            if (c.once("chop" + i, tc)) { game.sfx("cut"); VIEW.shake = 0.25; c.freeze = 0.05; const x = rib0 + s * piece * (i + 1); for (let j = 0; j < 8; j++) P.spark(V3(x, ribY, 0), j % 2 ? "#7ff1e2" : "#ffffff", 0.1, V3((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, 0), 0.3); }
+            if (c.once("land" + i, land[i])) { game.sfx("poof"); X.grit(spots[i], 4); }
+          });
+          if (c.once("mrna", T.mrna)) { game.sfx("select"); def.flash = 0.1; }
+          T.slice.forEach((ts, i) => { if (c.once("pair" + i, ts - 0.3)) game.sfx("ding"); if (c.once("slice" + i, ts)) { game.sfx("cut"); c.freeze = 0.06; VIEW.shake = 0.35; for (let j = 0; j < 10; j++) P.spark(V3(sliceX(i), ribH[i], 0), j % 2 ? D.col : "#ffffff", 0.1, V3((Math.random() - 0.5) * 7, Math.random() * 4, 0), 0.35); } });
+          if (c.once("palm", T.palm)) game.sfx("fizzle");
+          for (let j = 0; j < 6; j++) if (c.once("fl" + j, T.flurry + j * 0.075)) { game.sfx(j === 5 ? "impact" : "zap"); def.flash = 0.1; VIEW.shake = 0.3 + 0.08 * j; if (j === 5) { c.freeze = 0.1; VIEW.impact = 0.14; FX2D.cx = VIEW.sx(def.x) / VIEW_W; FX2D.cy = VIEW.sy(1.1) / VIEW_H; } P.hit(V3(def.x + (Math.random() - 0.5) * 0.6, 0.8 + Math.random() * 0.9, 0), j % 2 ? D.col : "#ffffff", 1); }
+          if (c.once("vanish", T.vanish)) game.sfx("poof");
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(def.x, 8); }
+        },
+        drawDef(g, t) {
+          if (t < T.palm) return X.drawDefIdle(g, t);
+          if (t < T.flurry) return defPose(g, def, t < T.silent + 0.25 ? "palm" : "dizzy", def.x, 0, { flash: def.flash });
+          if (t < T.down) return defPose(g, def, Math.floor((t - T.flurry) / 0.075) % 2 ? "hitBody" : "hitHigh", def.x, 0, { flash: def.flash });
+          const u = t - T.down; defPose(g, def, "down", def.x, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.15 * spring(u, 8, 20)) });
+        },
+        drawBack(g, t) { // the shadow ninjas stand behind the opponent's mRNAs
+          for (let i = 0; i < 3; i++) {
+            if (t < land[i]) continue;
+            const a = Math.min(1, (t - land[i]) / 0.12) * (1 - seg(t, T.vanish, T.vanish + 0.15)); if (a <= 0) continue;
+            const ts = T.slice[i];
+            if (t > ts - 0.08 && t < ts + 0.14) { // the dash through its mRNA, with afterimages
+              const u = seg(t, ts - 0.08, ts + 0.14), x0 = spots[i], x1 = lim(spots[i] === spots[1] ? def.x - s * 3.4 : def.x + s * 0.9), dx = lerp(x0, x1, u);
+              for (let k = 1; k < 4; k++) ninja(g, lerp(x0, x1, Math.max(0, u - k * 0.12)), 3, a * 0.25 / k, Math.sign(x1 - x0) || s);
+              ninja(g, dx, 3, a, Math.sign(x1 - x0) || s); continue;
+            }
+            const sx = t >= ts + 0.14 ? lim(spots[i] === spots[1] ? def.x - s * 3.4 : def.x + s * 0.9) : spots[i];
+            if (t > T.flurry && t < T.vanish) { // the flurry: every ninja blinks from side to side through the opponent
+              const j = Math.floor((t - T.flurry) / 0.075 + i), side = j % 2 ? 1 : -1; ninja(g, def.x + side * (0.9 + 0.25 * i), 3, a, -side); continue;
+            }
+            ninja(g, sx, 0, a, Math.sign(def.x - sx) || s);
+            if (t < ts - 0.3) drawStrand(g, guideAt(i, t), comp(SEQS[i]), { dir: -1, base: 0.1, w: 0.04, col: "#ffd36b", glow: "#ffd36b", alpha: a });
+          }
+          for (let i = 0; i < 3; i++) { // smoke: a puff where each ninja lands, a burst when they vanish
+            if (t > land[i] - 0.05 && t < land[i] + 0.45) { const u = seg(t, land[i] - 0.05, land[i] + 0.45); domStrip(g, IM.smoke, M.smoke, 0, VIEW.sx(spots[i]), VIEW.sy(-0.1), VIEW.S * 1.6 / M.smoke.frames[0][2] * (0.7 + 0.5 * u), { alpha: 1 - u * u }); }
+          }
+        },
+        drawProps(g, t) {
+          // the double-stranded RNA, thrown up and chopped from one end, piece by piece
+          if (t >= T.throw && t < land[2]) {
+            const fly = easeOut(seg(t, T.throw, T.throw + 0.35)), done = T.chop.filter((tc) => t >= tc).length;
+            if (done < 3) { const a = rib0 + s * piece * done, b = rib0 + s * piece * 3, xa = Math.min(a, b), xb = Math.max(a, b), y = lerp(1.6, ribY, fly), ox = lerp(startX, 0, fly) * (1 - fly);
+              drawDNA(g, xa + ox, xb + ox, y, { turn: 0.6, R: 0.14, phase: t * 3, alpha: Math.min(1, fly * 2) }); }
+            for (let i = 0; i < done; i++) { // each chopped piece falls to its ninja's spot, losing its passenger strand on the way
+              const u = seg(t, T.chop[i], land[i]); if (u >= 1) continue; const x0 = rib0 + s * piece * (i + 0.5), x = lerp(x0, spots[i], u), y = lerp(ribY, 0.6, easeIn(u));
+              drawDNA(g, x - piece / 2, x + piece / 2, y, { turn: 0.6, R: 0.14, phase: t * 8, alpha: 1 - u * 0.3 });
+            }
+          }
+          if (t >= T.dicer && t < T.chop[2] + 0.35) { // Dicer works along the RNA: blades up, chop, move on
+            const i = Math.min(2, T.chop.filter((tc) => t >= tc - 0.12).length), tc = T.chop[Math.min(2, i)], k = t - tc;
+            const cutAt = rib0 + s * piece * (Math.min(i, 2) + 1), x = cutAt, f = k > -0.04 && k < 0.18 ? 1 : 0, a = Math.min(1, (t - T.dicer) / 0.15) * (1 - seg(t, T.chop[2] + 0.15, T.chop[2] + 0.35));
+            const Dm = M.dicer, px = VIEW.S * 2.0 / Dm.frames[0][2]; domStrip(g, IM.dicer, Dm, f, VIEW.sx(x - s * 0.55), VIEW.sy(ribY - 0.25), px, { flip: s, alpha: a });
+          }
+          // the opponent's mRNAs
+          if (t >= T.mrna && t < T.vanish) for (let i = 0; i < 3; i++) {
+            const ts = T.slice[i], seq = SEQS[i];
+            if (t < ts) {
+              drawStrand(g, mrnaPath(i, t, unfurl(t)), seq.slice(0, Math.max(1, Math.round(seq.length * unfurl(t)))), { base: 0.15, w: 0.055, col: "#c98bff" });
+              const [lx, ly] = mrnaPath(i, t, unfurl(t))(1); g.save(); g.font = "11px P2, monospace"; g.textAlign = s > 0 ? "right" : "left"; g.lineWidth = 4; g.strokeStyle = "#140a24"; g.globalAlpha = unfurl(t); g.strokeText(NAMES[i], VIEW.sx(lx) - s * 8, VIEW.sy(ly) + 4); g.fillStyle = "#ffffff"; g.fillText(NAMES[i], VIEW.sx(lx) - s * 8, VIEW.sy(ly) + 4); g.restore();
+              if (t > ts - 0.3) { // the guide strand lines up under its match: A-U and G-C pairs
+                const k = easeOut(seg(t, ts - 0.3, ts - 0.12)), base = mrnaPath(i, t); drawStrand(g, (u) => { const [x, y] = base(u); return [x, y - 0.3 + 0.0 * k - (1 - k) * 0.6]; }, comp(seq), { dir: -1, base: 0.15, w: 0.05, col: "#ffd36b", glow: "#ffd36b", alpha: k });
+              }
+            } else { // sliced: the two halves fall away and break down
+              const u = seg(t, ts, ts + 0.6); if (u >= 1) continue; const half = Math.floor(seq.length * 0.55), base = mrnaPath(i, ts);
+              drawStrand(g, (v) => { const [x, y] = base(v * 0.55); return [x - s * 0.1 * u, y - 1.2 * u * u + Math.sin(v * 5) * 0.1 * u]; }, seq.slice(0, half), { base: 0.15, w: 0.055, col: "#c98bff", alpha: 1 - u });
+              drawStrand(g, (v) => { const [x, y] = base(0.55 + v * 0.45); return [x + s * 0.1 * u, y - 1.4 * u * u - Math.sin(v * 5) * 0.1 * u]; }, seq.slice(half), { base: 0.15, w: 0.055, col: "#c98bff", alpha: 1 - u });
+            }
+          }
+          if (t > T.palm && t < T.palm + 0.5) { // the attack fizzles: no mRNA, no protein, no move
+            const u = seg(t, T.palm, T.palm + 0.5), b = defBox(def, "palm"), hx = def.x + b[0] + def.face * b[2] * 0.45; domStrip(g, IM.smoke, M.smoke, 0, VIEW.sx(hx), VIEW.sy(1.05), VIEW.S * 0.5 / M.smoke.frames[0][2] * (1 + u), { alpha: 0.6 * (1 - u) });
+          }
+          if (t > T.flurry && t < T.vanish) for (let j = 0; j < 6; j++) { // the slashes of the flurry
+            const t0 = T.flurry + j * 0.075, u = seg(t, t0, t0 + 0.14); if (t < t0 || u >= 1) continue; const cx = VIEW.sx(def.x), cy = VIEW.sy(1.1), a = (j * 1.1) % Math.PI, L = 1.3 * VIEW.S;
+            g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = 1 - u; g.strokeStyle = j % 2 ? "#ff9cf0" : "#ffffff"; g.lineWidth = 7 * (1 - u) + 1; g.beginPath(); g.moveTo(cx - Math.cos(a) * L, cy - Math.sin(a) * L); g.lineTo(cx + Math.cos(a) * L, cy + Math.sin(a) * L); g.stroke(); g.restore();
+          }
+          if (t > T.vanish - 0.05 && t < T.vanish + 0.6) for (let i = 0; i < 3; i++) { // the ninjas vanish in smoke
+            const u = seg(t, T.vanish - 0.05, T.vanish + 0.6), j = Math.floor((T.vanish - T.flurry) / 0.075 + i), side = j % 2 ? 1 : -1, x = def.x + side * (0.9 + 0.25 * i);
+            domStrip(g, IM.smoke, M.smoke, 1, VIEW.sx(x), VIEW.sy(-0.2), VIEW.S * 2.2 / M.smoke.frames[1][2] * (0.8 + 0.4 * u), { alpha: 1 - u * u });
+          }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          T.chop.forEach((tc, i) => pop("CHOP!", tc, VIEW.sx(rib0 + s * piece * (i + 1)), VIEW.sy(ribY + 0.75), 40 + i * 6, "#7ff1e2", i % 2 ? 0.1 : -0.1, 0.4));
+          T.slice.forEach((ts, i) => pop("SLICE!", ts, VIEW.sx(sliceX(i) - s * 0.8), VIEW.sy(ribH[i] + 0.55), 46, "#ff9cf0", i % 2 ? 0.1 : -0.1, 0.45));
+          if (t > T.palm + 0.08 && t < T.silent + 0.05) { const [bx, top] = defBox(def, "palm"); X.speech(g, [VIEW.sx(def.x + bx), VIEW.sy(top - 0.1), VIEW.sy(top + 0.1)], ["...?"], 1); }
+          pop("SILENCED!", T.silent, VIEW.sx(def.x), VIEW.sy(2.75), 62, "#ffffff", -0.06, 0.5);
+        },
+      };
+    },
+  },
 };
 
 function domainCine(game, att, def) {
@@ -471,7 +626,7 @@ function domainCine(game, att, def) {
     drawDefIdle(g, t) { def.hidden = false; def.cineAnim = AN("idle", t * 30); drawFighter(g, def); def.hidden = true; },
     exclaim(g, u) { const b = Math.abs(Math.sin(u * 14)) * 6; g.save(); g.font = "34px P2, monospace"; g.textAlign = "center"; g.lineWidth = 7; g.strokeStyle = "#1a0b2e"; const tx = VIEW.sx(def.x), ty = VIEW.sy(2.25) - b; g.strokeText("!", tx, ty); g.fillStyle = "#ffe14d"; g.fillText("!", tx, ty); g.restore(); },
     speech(g, [bx, by, top], lines, u) { // a comic speech bubble above a prop, typed out letter by letter
-      const n = Math.floor(u / 0.03), W = 230, H = 18 + lines.length * 22, x0 = clamp(bx + 40, 8, VIEW_W - W - 8), y0 = Math.max(70, top - H - 14);
+      const n = Math.floor(u / 0.03), W = Math.max(64, Math.max(...lines.map((l) => l.length)) * 13 + 28), H = 18 + lines.length * 22, x0 = clamp(bx + 40, 8, VIEW_W - W - 8), y0 = Math.max(70, top - H - 14);
       g.save(); g.fillStyle = "#ffffff"; g.strokeStyle = "#1a0b2e"; g.lineWidth = 4; g.beginPath(); g.roundRect(x0, y0, W, H, 12); g.fill(); g.stroke();
       g.beginPath(); const tx = clamp(bx + 30, x0 + 20, x0 + W - 20), ang = Math.atan2(by - y0 - H, bx - tx), L = 34; g.moveTo(tx - 10, y0 + H - 2); g.lineTo(tx + Math.cos(ang) * L, y0 + H + Math.sin(ang) * L); g.lineTo(tx + 10, y0 + H - 2); g.closePath(); g.fill(); g.stroke(); g.fillStyle = "#ffffff"; g.fillRect(tx - 8, y0 + H - 5, 16, 5);
       g.fillStyle = "#1a0b2e"; g.font = "13px P2, monospace"; g.textAlign = "left"; let k = n;

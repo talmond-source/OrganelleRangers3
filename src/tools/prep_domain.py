@@ -32,6 +32,12 @@ Precision Cut Theater (crispr):
   poses.png   2 x 2 CRISPR Ranger poses: hand sign, expansion, command, snip finish
   cas9-original.png  Cas9 open and shut (top row). Its DNA pieces (bottom row) are not used: the game draws that DNA
               itself so the pairs, the twist and the cut site are exact
+
+Silent Shadow Interference (rna):
+  bg.png      the shadow dojo (lanterns shaped like ribosomes)
+  poses.png   2 x 2 RNA Ranger poses: hand sign (two-finger seal), expansion, throw, ninja dash. The shadow ninjas are
+              these same poses drawn as silhouettes
+  dicer.png   2 x 2: Dicer blades up, Dicer chopping, a smoke puff, a smoke burst -> dicer.png (top row) + smoke.png
 """
 import os, sys, json
 import numpy as np
@@ -148,12 +154,28 @@ def crispr(meta):
     meta['crispr'] = m
 
 
+def rna(meta):
+    src, dst = os.path.join(SRC, 'rna'), os.path.join(DST, 'rna'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 790}
+    m['poses'] = ranger_poses(src, dst)
+    cc = cells(os.path.join(src, 'dicer.png'), 2, 2)
+    dc = [clean_white(c) for c in cc[:2]]; b0 = bbox(dc[0]); sheet, info = strip(dc, 300 / (b0[2] - b0[0] + 1))
+    sheet.save(os.path.join(dst, 'dicer.png'), optimize=True); m['dicer'] = info
+    cc[2][:, -60:] = 255  # a wisp of the burst reaches into the puff's cell
+    sm = [clean_white(c, keep_all=True) for c in cc[2:]]; b0 = bbox(sm[0]); sheet, info = strip(sm, 260 / (b0[2] - b0[0] + 1))
+    sheet.save(os.path.join(dst, 'smoke.png'), optimize=True); m['smoke'] = info
+    meta['rna'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
     golgi(meta)
     rougher(meta)
     crispr(meta)
+    rna(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

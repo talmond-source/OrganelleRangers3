@@ -74,6 +74,12 @@ Infinite Translation (ribosome):
   poses.png   2 x 2 Ribosome Ranger poses: hand sign (cupped hands, a gap between), expansion, reading, fold
   props.png   2 x 2: ribosome (large subunit over small, a gap for the mRNA), tRNA with its amino acid, empty tRNA,
               folded protein (blue to red, start to end). The mRNA, codons, anticodons and chain are drawn in code
+
+Digestive Abyss: pH 5 (lysosome):
+  bg.png      inside a lysosome: proton pumps facing in, the inner sugar coat (glycocalyx), an acid pool
+  poses.png   2 x 2 Lysosome Ranger poses: hand sign (jaws), expansion, swallow, chomp
+  props.png   2 x 2: enzyme asleep, enzyme awake (jaws open), enzyme biting, proton pump. The phagosome, H+ ions,
+              pH meter and recycled building blocks are drawn in code
 """
 import os, sys, json
 import numpy as np
@@ -297,6 +303,17 @@ def ribosome(meta):
     meta['ribosome'] = m
 
 
+def lysosome(meta):
+    src, dst = os.path.join(SRC, 'lysosome'), os.path.join(DST, 'lysosome'); os.makedirs(dst, exist_ok=True)
+    m = {}
+    bg = Image.open(os.path.join(src, 'bg.png')).convert('RGB'); bg.save(os.path.join(dst, 'bg.jpg'), quality=86, optimize=True)
+    m['bg'] = {'size': list(bg.size), 'floor': 790, 'pumps': [[150, 600], [335, 262], [836, 170], [1335, 262], [1525, 600]]}
+    m['poses'] = ranger_poses(src, dst)
+    cc = [clean_white(c, keep_all=(i == 2)) for i, c in enumerate(cells(os.path.join(src, 'props.png'), 2, 2))]
+    b0 = bbox(cc[0]); sheet, info = strip(cc, 200 / (b0[2] - b0[0] + 1)); sheet.save(os.path.join(dst, 'props.png'), optimize=True); m['props'] = info
+    meta['lysosome'] = m
+
+
 def main():
     meta = {}
     nucleus(meta)
@@ -310,6 +327,7 @@ def main():
     phage(meta)
     cytoplasm(meta)
     ribosome(meta)
+    lysosome(meta)
     json.dump(meta, open(os.path.join(DST, 'meta.json'), 'w'))
     print(json.dumps(meta))
 

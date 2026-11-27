@@ -1250,6 +1250,118 @@ const DOMAINS = {
       };
     },
   },
+
+  /* ---------- Lysosome: Digestive Abyss. Engulfed, fused, acidified to pH 5 - which switches the enzymes on - and digested into building blocks ---------- */
+  lysosome: {
+    name: "DIGESTIVE ABYSS: pH 5", col: "#e0245e", gold: "#c8ff3a", mote: "#e6ff8a", dur: 7.3, shatter: 6.5, pull: 6.25, dim: 0.08,
+    glow: [836, 700, 420, "#c8ff3a"],
+    mv: { knock: [3, 6] },
+    setup(c, X) {
+      const { game, att, def, s, P, M, IM, D, mid } = X;
+      const T = { engulf: 1.45, seal: 1.85, fuse: 2.2, pump: 2.45, pumpEnd: 3.55, wake: 3.62, digest: 3.95, bite: 0.13, nb: 10, spit: 5.4, down: 5.75 };
+      const PR = M.props, rnd = (i, k) => { const v = Math.sin(i * 127.1 + k * 311.7) * 43758.5453; return v - Math.floor(v); };
+      const [bx, top] = defBox(def, "hitBody"), cx = def.x + bx, R = Math.max(1.25, top * 0.62);
+      const lift = (t) => ss(t, T.engulf, T.seal) * 0.35, bcy = (t) => R + 0.05 + lift(t) + Math.sin(t * 2.2) * 0.04;
+      const pH = (t) => (t < T.pump ? 7.2 : t < T.pumpEnd ? lerp(7.2, 5.0, easeIn(seg(t, T.pump, T.pumpEnd))) : 5.0);
+      const ion = (i) => ({ pump: i % 5, t0: T.pump + i * 0.045, dur: 0.45 + rnd(i, 1) * 0.15, off: [(rnd(i, 2) - 0.5) * 1.4, (rnd(i, 3) - 0.5) * 1.4] });
+      const NI = 24, ions = Array.from({ length: NI }, (_, i) => ion(i));
+      const NE = 5, enz = (i, t) => { // where enzyme i floats; during the digest it darts in to bite
+        const a = i / NE * TAU + t * 0.6, r0 = R * 0.72, home = [cx + Math.cos(a) * r0, bcy(t) + Math.sin(a) * r0 * 0.85];
+        if (t < T.digest) return { p: home, f: t < T.wake ? 0 : 1, a };
+        const k = Math.floor((t - T.digest) / T.bite), who = k % NE, u = ((t - T.digest) / T.bite) % 1;
+        if (t >= T.digest + T.nb * T.bite || who !== i) return { p: home, f: 1, a };
+        const tgt = [cx + Math.cos(a) * R * 0.25, bcy(t) + Math.sin(a) * R * 0.25], d = u < 0.5 ? easeOut(u * 2) : 1 - easeIn((u - 0.5) * 2);
+        return { p: [lerp(home[0], tgt[0], d), lerp(home[1], tgt[1], d)], f: u > 0.4 && u < 0.7 ? 2 : 1, a };
+      };
+      const BLK = ["amino acid", "sugar", "fatty acid", "nucleotide"], blocks = Array.from({ length: T.nb }, (_, j) => ({ t0: T.digest + j * T.bite + T.bite * 0.55, kind: j % 4 }));
+      const drawBlock = (g, kind, x, y, a) => { // the building blocks lysosomes break things into: drawn as simple chemical icons
+        g.save(); g.globalAlpha = a; g.translate(x, y); g.lineWidth = 3; g.strokeStyle = "#1a0b2e";
+        if (kind === 0) { g.fillStyle = "#7db8ff"; g.beginPath(); g.arc(0, 0, 10, 0, TAU); g.fill(); g.stroke(); }
+        else if (kind === 1) { g.fillStyle = "#ffe14d"; g.beginPath(); for (let k = 0; k < 6; k++) g.lineTo(Math.cos(k * TAU / 6) * 11, Math.sin(k * TAU / 6) * 11); g.closePath(); g.fill(); g.stroke(); }
+        else if (kind === 2) { g.strokeStyle = "#1a0b2e"; g.lineWidth = 7; g.beginPath(); for (let k = 0; k < 6; k++) g.lineTo(-15 + k * 6, k % 2 ? -5 : 5); g.stroke(); g.strokeStyle = "#ffb04a"; g.lineWidth = 4; g.stroke(); }
+        else { g.fillStyle = "#c98bff"; g.beginPath(); g.moveTo(0, -11); g.lineTo(10, 7); g.lineTo(-10, 7); g.closePath(); g.fill(); g.stroke(); }
+        g.restore();
+      };
+      const pumpPts = () => DOMAIN_META.lysosome.bg.pumps.map(([ix, iy]) => domBgPt("lysosome", ix, iy));
+      const indicator = (p) => { const k = clamp((7.2 - p) / 2.2); return `hsl(${(120 - 90 * k) | 0},90%,52%)`; }; // universal indicator: green at 7, orange at 5
+      return {
+        poses: [[0, 0], [D.expand, 1], [T.engulf - 0.1, 2], [T.digest, 3], [T.spit + 0.2, 1]],
+        camera(t) {
+          if (t < T.engulf) { const k = ss(t, D.expand, D.expand + 0.7); return { x: lerp(att.x + s * 0.25, mid, k), S: lerp(150, 102, k) }; }
+          if (t < T.spit) { const k = ss(t, T.engulf, T.fuse); return { x: lerp(mid, cx - s * 0.8, k), S: lerp(102, 98, k) + 10 * ss(t, T.digest - 0.3, T.digest) * (1 - ss(t, T.spit - 0.3, T.spit)) }; }
+          const k = ss(t, T.spit, T.spit + 0.35); return { x: lerp(cx - s * 0.8, mid, k), S: lerp(108, 98, k) + 8 * spring(t - T.spit, 6, 18) };
+        },
+        step(t) {
+          if (c.once("engulf", T.engulf)) game.sfx("whoosh");
+          if (c.once("seal", T.seal)) { game.sfx("pop"); VIEW.shake = 0.25; }
+          if (c.once("fuse", T.fuse)) { game.sfx("splash"); VIEW.flash = 0.04; }
+          if (t > T.pump && t < T.pumpEnd && Math.random() < 0.35) game.sfx("zap");
+          if (c.once("wake", T.wake)) { game.sfx("charge"); game.sfx("ding"); VIEW.flash = 0.06; }
+          for (let j = 0; j < T.nb; j++) if (c.once("b" + j, T.digest + j * T.bite + T.bite * 0.45)) { c.freeze = 0.03; VIEW.shake = 0.18 + j * 0.03; game.sfx(j % 2 ? "crunch" : "impact"); def.flash = 0.1; }
+          if (c.once("spit", T.spit)) { c.freeze = 0.12; VIEW.impact = 0.15; VIEW.shake = 0.8; FX2D.cx = VIEW.sx(cx) / VIEW_W; FX2D.cy = VIEW.sy(bcy(t)) / VIEW_H; game.sfx("pop"); game.sfx("boom"); def.flash = 0.2; for (let q = 0; q < 20; q++) { const a = Math.random() * TAU, v = 4 + Math.random() * 6; P.spark(V3(cx, bcy(t), 0), q % 2 ? "#c8ff3a" : "#ff7aa8", 0.13, V3(Math.cos(a) * v, Math.sin(a) * v, 0), 0.45); } }
+          if (c.once("down", T.down)) { game.sfx("land"); X.grit(def.x + s * 0.8, 8); }
+        },
+        drawDef(g, t) {
+          if (t < T.engulf) return X.drawDefIdle(g, t);
+          if (t < T.spit) { const y = lift(t) + Math.sin(t * 2.2) * 0.04, key = t < T.digest ? (t < T.wake ? "hitBody" : "dizzy") : "hitBody"; return defPose(g, def, key, def.x, y, { flash: def.flash, rot: t < T.digest ? Math.sin(t * 1.7) * 0.08 : 0 }); }
+          if (t < T.down) { const u = seg(t, T.spit, T.down); return defPose(g, def, "launch", def.x + s * 0.8 * u, Math.sin(u * Math.PI) * 0.6 + lift(T.spit) * (1 - u), { flash: def.flash, rot: s * u * 0.4 }); }
+          const u = t - T.down; defPose(g, def, "down", def.x + s * 0.8, 0, { squash: (SPR.extra[def.id] ? 1 : 0.5) * (1 - 0.15 * spring(u, 8, 20)) });
+        },
+        drawBack(g, t) { // H+ ions fly from the proton pumps into the vesicle
+          if (t < T.pump - 0.05 || t > T.pumpEnd + 0.6) return;
+          const pts = pumpPts(), ex = VIEW.sx(cx), ey = VIEW.sy(bcy(t));
+          for (const io of ions) for (let rep = 0; rep < 3; rep++) {
+            const st = io.t0 + rep * 0.4; if (t < st || t > st + io.dur || st > T.pumpEnd) continue; const u = seg(t, st, st + io.dur), [px, py] = pts[io.pump];
+            const x = lerp(px, ex + io.off[0] * VIEW.S * 0.5, easeIn(u)), y = lerp(py, ey + io.off[1] * VIEW.S * 0.5, easeIn(u));
+            g.save(); g.globalCompositeOperation = "lighter"; g.fillStyle = "rgba(200,255,58,.35)"; g.beginPath(); g.arc(x, y, 14, 0, TAU); g.fill(); g.restore();
+            g.save(); g.font = "14px P2, monospace"; g.textAlign = "center"; g.textBaseline = "middle"; g.lineWidth = 4; g.strokeStyle = "#1a0b2e"; g.strokeText("H+", x, y); g.fillStyle = "#eaff9a"; g.fillText("H+", x, y); g.restore();
+          }
+          for (const [px, py] of pts) { const a = 0.5 + 0.5 * Math.sin(t * 20); g.save(); g.globalCompositeOperation = "lighter"; g.globalAlpha = a * (t < T.pumpEnd ? 1 : 1 - seg(t, T.pumpEnd, T.pumpEnd + 0.3)); const gl = g.createRadialGradient(px, py, 0, px, py, 50); gl.addColorStop(0, "rgba(220,255,90,.8)"); gl.addColorStop(1, "rgba(220,255,90,0)"); g.fillStyle = gl; g.beginPath(); g.arc(px, py, 50, 0, TAU); g.fill(); g.restore(); }
+        },
+        drawProps(g, t) {
+          // the phagosome: a membrane bubble (two lines: a bilayer) that closes round the opponent, then fuses and fills with acid
+          if (t >= T.engulf && t < T.spit + 0.35) {
+            const close = easeOut(seg(t, T.engulf, T.seal)), x = VIEW.sx(cx), y = VIEW.sy(bcy(t)), r = R * VIEW.S, a = 1 - seg(t, T.spit, T.spit + 0.35), p = pH(t);
+            const span = close * TAU, fused = t >= T.fuse;
+            g.save(); g.globalAlpha = a;
+            if (close > 0.98) { g.fillStyle = t < T.pump ? "rgba(255,150,190,.16)" : `hsla(${(120 - 90 * clamp((7.2 - p) / 2.2)) | 0},90%,52%,.22)`; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); }
+            const ring = (rr, w) => { g.lineWidth = w; g.beginPath(); g.arc(x, y + (1 - close) * r * 0.6, rr, Math.PI / 2 - span / 2, Math.PI / 2 + span / 2, true); g.stroke(); };
+            g.strokeStyle = fused ? "#e0245e" : "#ff9ac0"; ring(r, 6); ring(Math.max(1, r - 11), 3);
+            if (t > T.fuse && t < T.fuse + 0.35) { const u = seg(t, T.fuse, T.fuse + 0.35); g.globalCompositeOperation = "lighter"; g.strokeStyle = `rgba(255,120,170,${1 - u})`; g.lineWidth = 10; g.beginPath(); g.arc(x, y, r * (1 + 0.4 * u), 0, TAU); g.stroke(); }
+            g.restore();
+            if (t > T.digest - 0.2 && t < T.spit) for (let i = 0; i < 8; i++) { const k = (t * 0.6 + i / 8) % 1, bx2 = x + Math.cos(i * 2.3) * r * 0.6, by = y + r * 0.7 - k * r * 1.3; g.save(); g.globalAlpha = 0.6 * Math.sin(k * Math.PI); g.strokeStyle = "#eaff9a"; g.lineWidth = 2; g.beginPath(); g.arc(bx2, by, 4 + (i % 3) * 2, 0, TAU); g.stroke(); g.restore(); }
+          }
+          // the enzymes: asleep at pH 7, they switch on at pH 5 and digest
+          if (t >= T.pump - 0.3 && t < T.spit) for (let i = 0; i < NE; i++) {
+            const e = enz(i, t), a = Math.min(1, (t - T.pump + 0.3) / 0.25), face = e.p[0] > cx ? -1 : 1, pop = t >= T.wake ? 1 + 0.25 * spring(t - T.wake, 9, 28) : 1;
+            const fr = PR.frames[e.f], px = VIEW.S * 0.62 / PR.frames[0][2] * pop, wob = t < T.wake ? Math.sin(t * 2 + i) * 3 : 0;
+            g.save(); g.globalAlpha = a; domCentered(g, IM.props, PR, e.f, VIEW.sx(e.p[0]), VIEW.sy(e.p[1]) + wob, px, { kx: face }); g.restore();
+            if (t < T.wake) { const zx = VIEW.sx(e.p[0]) + 22, zy = VIEW.sy(e.p[1]) - 28 - ((t * 30 + i * 9) % 18); g.save(); g.globalAlpha = a * 0.9; g.font = "12px P2, monospace"; g.lineWidth = 4; g.strokeStyle = "#1a0b2e"; g.strokeText("z", zx, zy); g.fillStyle = "#ffffff"; g.fillText("z", zx, zy); g.restore(); }
+          }
+          // building blocks fly out of each bite: what the cell recycles
+          for (const b of blocks) { if (t < b.t0 || t > b.t0 + 0.9) continue; const u = seg(t, b.t0, b.t0 + 0.9), a0 = -Math.PI / 2 + (b.kind - 1.5) * 0.55 + (s > 0 ? 0.25 : -0.25), d = (0.6 + 2.2 * easeOut(u)) * VIEW.S, x = VIEW.sx(cx) + Math.cos(a0) * d, y = VIEW.sy(bcy(t)) + Math.sin(a0) * d + 240 * u * u;
+            drawBlock(g, b.kind, x, y, 1 - seg(u, 0.7, 1)); if (u < 0.6) { g.save(); g.globalAlpha = 1 - u / 0.6; g.font = "11px P2, monospace"; g.textAlign = "center"; g.lineWidth = 4; g.strokeStyle = "#1a0b2e"; g.strokeText(BLK[b.kind], x, y - 18); g.fillStyle = "#ffffff"; g.fillText(BLK[b.kind], x, y - 18); g.restore(); } }
+        },
+        text(g, t) {
+          const pop = (word, at, x, y, size, col, rot, life = 0.5) => { if (t > at && t < at + life) { const u = t - at; comic(g, word, x, y, size, col, backOut(seg(u, 0, 0.15)) * (1 - seg(u, life - 0.12, life)), rot); } };
+          const hx = VIEW.sx(cx), hy = Math.max(110, VIEW.sy(bcy(t) + R + 0.45));
+          pop("ENGULF!", T.engulf + 0.1, hx, hy, 50, "#ff9ac0", -0.06, 0.45);
+          pop("FUSE!", T.fuse, hx, hy, 50, "#ffffff", 0.06, 0.4);
+          pop("ENZYMES ACTIVE!", T.wake, hx, hy, 50, "#c8ff3a", -0.05, 0.55);
+          for (let j = 0; j < T.nb; j += 3) pop("CHOMP!", T.digest + j * T.bite + T.bite * 0.45, hx + (j % 2 ? 1 : -1) * 150, hy + 30, 36 + j * 2, "#ff7aa8", j % 2 ? 0.1 : -0.1, 0.3);
+          pop("DIGESTED!", T.spit, hx, hy, 60, "#c8ff3a", -0.05, 0.6);
+          if (t > T.pump - 0.4 && t < T.spit + 0.2) { // the pH meter, coloured like universal indicator
+            const p = pH(t), a = Math.min(1, (t - T.pump + 0.4) / 0.2) * (1 - seg(t, T.spit, T.spit + 0.2)), W = 190, Hh = 70, x0 = s > 0 ? VIEW_W - W - 40 : 40, y0 = 100;
+            g.save(); g.globalAlpha = a; g.fillStyle = "rgba(20,8,24,.85)"; g.strokeStyle = "#ffffff"; g.lineWidth = 3; g.beginPath(); g.roundRect(x0, y0, W, Hh, 10); g.fill(); g.stroke();
+            g.font = "28px P2, monospace"; g.textAlign = "center"; g.fillStyle = indicator(p); g.fillText("pH " + p.toFixed(1), x0 + W / 2, y0 + 38);
+            g.fillStyle = "#ffffff"; g.font = "10px P2, monospace"; g.fillText(t < T.wake ? (t < T.pump ? "CYTOSOL" : "PUMPING H+") : "ACIDIC", x0 + W / 2, y0 + 58);
+            const bw2 = W - 20, k = clamp((7.2 - p) / 2.2); g.fillStyle = "#333"; g.fillRect(x0 + 10, y0 + Hh - 8, bw2, 4); g.fillStyle = indicator(p); g.fillRect(x0 + 10, y0 + Hh - 8, bw2 * k, 4); g.restore();
+          }
+          if (t > T.digest && t < T.spit + 0.4) { const n = Math.min(T.nb, Math.floor((t - T.digest) / T.bite + 0.45)), txt = "RECYCLED: " + n; g.save(); g.font = "16px P2, monospace"; g.textAlign = "center"; g.lineWidth = 6; g.strokeStyle = "#1a0b2e"; const x = VIEW.sx(cx), y = VIEW.sy(bcy(t) - R - 0.2) + 10; g.strokeText(txt, x, Math.min(FLOOR_Y + 30, y)); g.fillStyle = "#c8ff3a"; g.fillText(txt, x, Math.min(FLOOR_Y + 30, y)); g.restore(); }
+        },
+      };
+    },
+  },
 };
 
 function domainCine(game, att, def) {

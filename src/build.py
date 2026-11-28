@@ -43,8 +43,15 @@ for f in sorted(os.listdir('intro')):
     elif f.endswith('.png'):  # roll-call strips: high-quality lossy WebP with exact alpha
         buf = io.BytesIO(); Image.open('intro/' + f).convert('RGBA').save(buf, 'WEBP', quality=92, alpha_quality=100, method=6)
         intro[f[:-4]] = 'data:image/webp;base64,' + base64.b64encode(buf.getvalue()).decode()
-data_js = 'const SPRITE_DATA = %s;\nconst SPRITE_META = %s;\nconst STAGE_DATA = %s;\nconst MEGA_DATA = %s;\nconst DOMAIN_DATA = %s;\nconst DOMAIN_META = %s;\nconst INTRO_DATA = %s;\nconst INTRO_META = %s;\n' % (json.dumps(sprites), json.dumps(meta), json.dumps(stages), json.dumps(megas), json.dumps(domains), open('domain/meta.json').read(), json.dumps(intro), open('intro/meta.json').read())
-js = "\n".join(open(f).read() for f in ['data.js', 'diagrams.js', 'molecules.js', 'core2d.js', 'pose.js', 'fx.js', 'audio.js', 'music.js', 'fight.js', 'gamepad.js', 'kits.js', 'kits2.js', 'megas2d.js', 'domains2d.js', 'intro2d.js', 'title2d.js', 'app.js'])
+# Story mode panels (ChatGPT illustrations, two panels per picture): art/story/<key>.png -> lossy WebP
+story = {}
+if os.path.isdir('art/story'):
+    for f in sorted(os.listdir('art/story')):
+        if f.endswith('.png'):
+            im = Image.open('art/story/' + f).convert('RGB'); im = im.resize((1400, round(im.height * 1400 / im.width)), Image.LANCZOS); buf = io.BytesIO(); im.save(buf, 'WEBP', quality=82, method=6)
+            story[f[:-4]] = 'data:image/webp;base64,' + base64.b64encode(buf.getvalue()).decode()
+data_js = 'const SPRITE_DATA = %s;\nconst SPRITE_META = %s;\nconst STAGE_DATA = %s;\nconst MEGA_DATA = %s;\nconst DOMAIN_DATA = %s;\nconst DOMAIN_META = %s;\nconst INTRO_DATA = %s;\nconst INTRO_META = %s;\nconst STORY_DATA = %s;\n' % (json.dumps(sprites), json.dumps(meta), json.dumps(stages), json.dumps(megas), json.dumps(domains), open('domain/meta.json').read(), json.dumps(intro), open('intro/meta.json').read(), json.dumps(story))
+js = "\n".join(open(f).read() for f in ['data.js', 'diagrams.js', 'molecules.js', 'core2d.js', 'pose.js', 'fx.js', 'audio.js', 'music.js', 'fight.js', 'gamepad.js', 'kits.js', 'kits2.js', 'megas2d.js', 'domains2d.js', 'intro2d.js', 'title2d.js', 'story.js', 'story2d.js', 'app.js'])
 js += '\nAPP.init();\n'
 def esc(s):
     out = []

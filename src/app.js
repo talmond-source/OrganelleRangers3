@@ -143,9 +143,10 @@ const APP = {
   toMovie() { this.toIntro(); },
   toIntro() { this.endGame(); this.mode = "intro"; this.screens(null); HUD.show(false); SHOW.setVisible(false); INTRO.show(true); AUDIO.stopMusic(); document.body.classList.add("story"); INTRO.start(); $id("cards").innerHTML = ""; $id("sideMode").textContent = ""; $id("skipHint").hidden = false; },
   toPress() { const natural = this.mode === "intro" && INTRO.natural; this.mode = "press"; this.screens("press"); $id("skipHint").hidden = true; document.body.classList.remove("story"); INTRO.toLogo(); const l = $id("press").querySelector(".logo2"); l.classList.remove("in"); void l.offsetWidth; l.classList.add("in"); if (!natural) AUDIO.sfx("boom"); },
-  toTitle() { const fromFight = !!this.game; this.endGame(); this.mode = "title"; this.screens("title"); HUD.show(false); SHOW.setVisible(false); INTRO.show(true); if (INTRO.phase !== "logo") INTRO.toLogo(); this.menuSel("mainList", 0); $id("sideMode").textContent = ""; $id("cards").innerHTML = ""; if (fromFight || !AUDIO.music) this.setMusic("menu"); },
+  toTitle() { const fromFight = !!this.game; if (typeof SM !== "undefined") { SM.active = false; this.story = false; this.storyFight = null; $id("story").hidden = true; $id("smNarr").hidden = true; document.body.classList.remove("smui"); } this.endGame(); this.mode = "title"; this.screens("title"); HUD.show(false); SHOW.setVisible(false); INTRO.show(true); if (INTRO.phase !== "logo") INTRO.toLogo(); this.menuSel("mainList", 0); $id("sideMode").textContent = ""; $id("cards").innerHTML = ""; if (fromFight || !AUDIO.music) this.setMusic("menu"); },
   menuSel(list, i) { const btns = [...$id(list).querySelectorAll(".mbtn")]; this.sel = (i + btns.length) % btns.length; btns.forEach((b, k) => b.classList.toggle("sel", k === this.sel)); this.menuList = list; },
   bindMenus() {
+    storyArt(); $id("story").addEventListener("click", (e) => SM.click(e)); $id("smNarr").addEventListener("click", () => SM.narrNext && SM.narrNext());
     $id("mainList").addEventListener("click", (e) => { const b = e.target.closest(".mbtn"); if (b) this.mainGo(b.dataset.go); });
     $id("setList").addEventListener("click", (e) => { const b = e.target.closest(".mbtn"); if (b) this.setGo(b.dataset.set); });
     $id("pauseList").addEventListener("click", (e) => { const b = e.target.closest(".mbtn"); if (b) this.pauseGo(b.dataset.p); });
@@ -153,7 +154,7 @@ const APP = {
     $id("diffList").addEventListener("click", (e) => { const b = e.target.closest(".mbtn"); if (b) this.diffGo(+b.dataset.d); });
     $id("press").addEventListener("click", () => this.mode === "press" && (AUDIO.sfx("confirm"), this.toTitle()));
   },
-  mainGo(go) { AUDIO.sfx("confirm"); if (go === "settings") { this.mode = "settings"; this.screens("settings"); this.menuSel("setList", 0); return; } if (go === "intro") return this.toMovie(); this.gameMode = go; this.toSelect(); },
+  mainGo(go) { AUDIO.sfx("confirm"); if (go === "settings") { this.mode = "settings"; this.screens("settings"); this.menuSel("setList", 0); return; } if (go === "intro") return this.toMovie(); if (go === "story") return SM.enter(); this.gameMode = go; this.toSelect(); },
   diffGo(d) { AUDIO.sfx("confirm"); this.diff = d; const me = this.picks[0]; const pool = ROSTER.filter((x) => x.ready && x.id !== me).map((x) => x.id).sort(() => Math.random() - 0.5).slice(0, TOWER_LEN); this.tower = { list: [...pool, "phage"], i: 0 }; this.picks[1] = this.tower.list[0]; this.startFight(towerStage(0)); },
   setGo(k) { AUDIO.sfx("select"); if (k === "back") return this.toTitle(); SET[k] = !SET[k]; saveSet(); this.applySettings(); if (k === "sound" && SET.sound) { AUDIO.init(); this.setMusic("menu"); } },
   /* ---------- select ---------- */
@@ -190,11 +191,11 @@ const APP = {
     if (tr) { this.game.training = true; this.game.timer = 99; }
     HUD.setup(this.game); HUD.show(true); $id("announce").innerHTML = "";
     sideCards([{ id: this.picks[0], slot: 0 }]);
-    $id("sideMode").textContent = tr ? "TRAINING" : `TOWER ${floor + 1}/${this.tower.list.length} · ${D.name}`; this.acc = 0; this.setMusic("fight");
+    $id("sideMode").textContent = tr ? "TRAINING" : !this.tower ? "STORY" : `TOWER ${floor + 1}/${this.tower.list.length} · ${D.name}`; this.acc = 0; this.setMusic("fight");
   },
   endGame() { if (this.game) { this.game.dispose(); this.game = null; } $id("announce").innerHTML = ""; $id("pops").innerHTML = ""; this.view && (this.view.impact = 0); },
-  pause(on) { if (this.mode !== "fight" && this.mode !== "paused") return; $id("movesOv").hidden = true; this.mode = on ? "paused" : "fight"; this.screens(on ? "pause" : null); $id("dumMode").textContent = this.dummy ? this.dummy.mode.toUpperCase() : "—"; $id("pauseList").querySelector('[data-p="dummy"]').hidden = this.gameMode !== "training"; if (on) this.menuSel("pauseList", 0); },
-  pauseGo(p) { AUDIO.sfx("confirm"); if (p === "resume") return this.pause(false); if (p === "moves") { $id("movesIn").innerHTML = $id("cards").innerHTML; $id("movesOv").hidden = false; return; } if (p === "dummy") { const m = ["stand", "block", "crouch"]; this.dummy.mode = m[(m.indexOf(this.dummy.mode) + 1) % 3]; $id("dumMode").textContent = this.dummy.mode.toUpperCase(); return; } if (p === "select") return this.toSelect(); this.toTitle(); },
+  pause(on) { if (this.mode !== "fight" && this.mode !== "paused") return; $id("movesOv").hidden = true; this.mode = on ? "paused" : "fight"; this.screens(on ? "pause" : null); $id("dumMode").textContent = this.dummy ? this.dummy.mode.toUpperCase() : "—"; $id("pauseList").querySelector('[data-p="dummy"]').hidden = this.gameMode !== "training"; $id("pauseList").querySelector('[data-p="select"]').hidden = !!this.storyFight; { const mb = $id("pauseList").querySelector('[data-p="menu"]'); if (mb) { mb.dataset.t = mb.dataset.t || mb.textContent; mb.textContent = this.storyFight ? "SAVE & STORY MAP" : mb.dataset.t; } } if (on) this.menuSel("pauseList", 0); },
+  pauseGo(p) { AUDIO.sfx("confirm"); if (p === "resume") return this.pause(false); if (p === "moves") { $id("movesIn").innerHTML = $id("cards").innerHTML; $id("movesOv").hidden = false; return; } if (p === "dummy") { const m = ["stand", "block", "crouch"]; this.dummy.mode = m[(m.indexOf(this.dummy.mode) + 1) % 3]; $id("dumMode").textContent = this.dummy.mode.toUpperCase(); return; } if (this.storyFight) { this.screens(null); return SM.quitFight(); } if (p === "select") return this.toSelect(); this.toTitle(); },
   showResults() {
     const g = this.game, w = g.f[g.result.winner], won = g.result.winner === 0, T = this.tower;
     this.mode = "results"; this.screens("results"); $id("resT").style.color = w.info.hex; let btns = "";
@@ -215,6 +216,8 @@ const APP = {
     const c = e.code; const up = c === "ArrowUp", dn = c === "ArrowDown", lf = c === "ArrowLeft", rt = c === "ArrowRight";
     const ok = c === "Enter" || c === "KeyZ" || c === "Space", back = c === "Escape" || c === "Backspace";
     if (this.mode === "movie") return;
+    if (this.mode === "story" || this.mode === "storyq") return SM.key(e);
+    if (this.mode === "fight" && this.storyFight && SM.narrNext && ok) { if (!e.repeat) SM.narrNext(); e.preventDefault(); return; }
     if (this.mode === "gate") { if (!e.repeat && !/^(Shift|Control|Alt|Meta|Tab)/.test(e.key)) this.fromGate(); e.preventDefault(); return; }
     if (this.mode === "intro") { if (!e.repeat) this.skipIntro(); e.preventDefault(); return; }
     if (this.mode === "press") { if (ok && !e.repeat) { AUDIO.sfx("confirm"); this.toTitle(); } e.preventDefault(); return; }
@@ -233,7 +236,7 @@ const APP = {
       if (ok && !e.repeat && !this.locked[0]) this.lockPick(0);
     }
   },
-  debugStep(n, dt = DT) { const g = this.game; for (let i = 0; i < n; i++) { if (g.phase === "over") break; g.step(); g.render(DT); } HUD.update(g); this.view.impact = Math.max(0, this.view.impact - (n - 1) * DT); this.drawFight(dt); if (g.phase === "over" && this.mode === "fight") this.showResults(); },
+  debugStep(n, dt = DT) { const g = this.game; for (let i = 0; i < n; i++) { if (g.phase === "over") break; g.step(); g.render(DT); } HUD.update(g); this.view.impact = Math.max(0, this.view.impact - (n - 1) * DT); this.drawFight(dt); if (g.phase === "over" && this.mode === "fight") { if (this.storyFight) SM.fightOver(g.result.winner === 0); else this.showResults(); } },
   drawFight(dt) { VIEW.begin(dt); this.game.draw(dt); VIEW.end(dt); },
   frame(dt) {
     if (window.__hold || this.mode === "movie") return;
@@ -242,10 +245,12 @@ const APP = {
       if (TOUCH) { const mb = document.querySelector(".ab.mega"); const rd = g.f[0].meter >= 100; if (mb._r !== rd) { mb._r = rd; mb.classList.toggle("ready", rd); } }
       if (g.training) { g.timer = 99; g.f[0].meter = 100; g.f.forEach((f) => { if (f.slot === 1 && f.bars === 1 && f.hp < 30 && ["idle", "down", "getup"].includes(f.state)) { f.bars = 2; f.hp = BAR_HP; } }); }
       g.render(dt, Math.min(1, this.acc / DT)); HUD.update(g); this.drawFight(dt);
-      if (g.phase === "over") this.showResults();
+      if (this.storyFight) SM.tick(g);
+      if (g.phase === "over") { if (this.storyFight) SM.fightOver(g.result.winner === 0); else this.showResults(); }
       return;
     }
-    if (this.mode === "paused" || this.mode === "results") { if (this.game) { this.game.render(0, Math.min(1, this.acc / DT)); this.drawFight(0); } return; }
+    if (this.mode === "story") return;
+    if (this.mode === "paused" || this.mode === "results" || this.mode === "storyq") { if (this.game) { this.game.render(0, Math.min(1, this.acc / DT)); this.drawFight(0); } return; }
     if (["intro", "press", "title", "settings"].includes(this.mode)) { INTRO.update(dt); if (this.mode === "intro" && INTRO.phase === "logo") this.toPress(); } else SHOW.update(dt, "select");
   },
 };

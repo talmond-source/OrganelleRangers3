@@ -111,7 +111,7 @@ class Fighter {
     if (this.canAct() && this.grounded) this.face = this.opp.x >= this.x ? 1 : -1;
     switch (this.state) {
       case "idle": case "walk": case "crouch": case "block": case "cblock": {
-        if (pr.ult && this.meter >= 100 && this.kit.ult) { this.startMove(this.kit.ult); break; }
+        if (pr.ult && this.meter >= 100 && this.kit.ult && !g.noUlt) { this.startMove(this.kit.ult); break; }
         if (pr.special) { const dir = c.down ? "down" : fwd ? "fwd" : back ? "back" : ""; const mv = this.kit.special(dir, this); if (mv) { this.startMove(mv); break; } }
         if (c.down) {
           if (pr.punch) { this.startMove(MELEE.upper); break; }
@@ -251,8 +251,9 @@ class Game {
   damage(def, n, att, chip) {
     if (n <= 0) return; def.hp -= n; def.lastHitBy = att;
     if (def.hp <= 0) {
-      if (def.bars > 1) { def.bars--; def.hp = BAR_HP + def.hp; def.ghostHp = BAR_HP; def.dispHp = BAR_HP; HUD.barBreak(def.slot); this.view.shake = 0.35; this.sfx("break");
+      if (def.bars > 1) { def.bars--; def.hp = BAR_HP + def.hp; def.ghostHp = BAR_HP; def.dispHp = BAR_HP; HUD.barBreak(def.slot); this.view.shake = 0.35; this.sfx("break"); if (this.onBarBreak) this.onBarBreak(def);
         if (!chip && this.phase === "fight") { def.set("air"); def.vx = att.face * 5; def.vy = 9; def.y = 0.01; } }
+      else if (this.noKO && this.noKO(def)) def.hp = 1;
       else { def.hp = 0; if (this.phase === "fight" || this.phase === "cine") this.ko(def); }
     }
   }

@@ -182,6 +182,9 @@ function drawFighter(g, me) {
     for (let i = 3; i < tr.length; i += 3) { const [gx, gy, gf, gr, ge, gm, gfl] = tr[i]; drawFrame(g, me.id, gf, gx, gy, me.face, { rot: gr, pivot: p.pivot, drop: p.drop, alpha: 0.4 * (1 - i / 10), silhouette: col, extra: ge, motion: gm, flow: gfl }); } }
   else if (me._trail) me._trail.length = 0;
   drawFrame(g, me.id, p.frame, x + me.face * (p.push || 0), y, me.face, { rot: p.rot, pivot: p.pivot, drop: p.drop, alpha: p.alpha, scale: p.scale, squash: p.squash, extra: p.extra, motion: p.motion, flow: p.flow, flash: me.flash });
+  // a hijacked Ranger (story mode): a sickly green glow pulsing over the suit
+  if (me.infected) { const t = me.game ? me.game.time : 0; g.save(); g.globalCompositeOperation = "lighter"; drawFrame(g, me.id, p.frame, x + me.face * (p.push || 0), y, me.face, { rot: p.rot, pivot: p.pivot, drop: p.drop, alpha: 0.2 + 0.1 * Math.sin(t * 5), scale: p.scale, squash: p.squash, extra: p.extra, motion: p.motion, flow: p.flow, silhouette: "#59ff2e" }); g.restore();
+    if (me.game && Math.random() < 0.12) me.game.parts.spark(V3(x + (Math.random() - 0.5) * 0.7, y + 0.3 + Math.random() * 1.5, 0.2), "#7dff4a", 0.06, V3((Math.random() - 0.5) * 0.6, 1 + Math.random(), 0), 0.5); }
   // energy held at the fist (or overhead) while a special charges
   if (p.orb && p.orb[3] > 0.02 && p.orb[2] > 0.01) { const [ox, oy, orr, oa] = p.orb, cx = VIEW.sx(x + me.face * (ox + (p.push || 0))), cy = VIEW.sy(y + oy) + (p.drop || 0) * VIEW.S, r = orr * VIEW.S, t = me.game ? me.game.time : 0;
     g.save(); g.globalCompositeOperation = "lighter"; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, r * 2.4); gr.addColorStop(0, rgba("#ffffff", 0.95 * oa)); gr.addColorStop(0.25, rgba(col, 0.8 * oa)); gr.addColorStop(1, rgba(col, 0)); g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, r * 2.4, 0, TAU); g.fill();

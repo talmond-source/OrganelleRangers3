@@ -1657,7 +1657,7 @@ function domainCine(game, att, def) {
   att.cineAnim = AN("idle", 0); def.cineAnim = AN("idle", 0); att.hidden = def.hidden = true; // this scene draws both fighters itself
   HUD.science(att, (MOVES[id] && MOVES[id].ult && MOVES[id].ult.name) || D.name);
   const s = att.face, mid = (att.x + def.x) / 2;
-  const c = { att, def, dmg: 35, mv: D.mv, t: 0, camX: att.x, camS: 98, fired: {}, freeze: 0, shards: null, trail: [],
+  const c = { att, def, dmg: 35, mv: D.mv, D, t: 0, camX: att.x, camS: 98, fired: {}, freeze: 0, shards: null, trail: [],
     once(k, at) { if (this.t >= at && !this.fired[k]) { this.fired[k] = 1; return true; } return false; },
   };
   // shared helpers the domains draw with

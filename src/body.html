@@ -33,6 +33,7 @@
       <div class="menu side" id="title" hidden>
         <div class="logo2 small"><div class="lgw"><img class="lg" alt="Organelle Rangers"><i class="shine"></i></div></div>
         <div class="mlist" id="mainList">
+          <button class="mbtn" data-go="story"><b>STORY MODE</b><small>"Hijacked": save the cell, chapter by chapter</small></button>
           <button class="mbtn" data-go="arcade"><b>SINGLE PLAYER</b><small>Climb the tower. Stop the Phage.</small></button>
           <button class="mbtn" data-go="training"><b>TRAINING</b><small>Practice with a full Megaform meter</small></button>
           <button class="mbtn" data-go="settings"><b>SETTINGS</b><small>Sound and screen filters</small></button>
@@ -74,6 +75,26 @@
       </div>
       <!-- pause -->
       <div class="menu res" id="pause" hidden><div class="card"><h2>PAUSED</h2><div class="mlist" id="pauseList" style="margin:0 auto"><button class="mbtn" data-p="resume">RESUME</button><button class="mbtn" data-p="dummy">TRAINING DUMMY: <small id="dumMode"></small></button><button class="mbtn" data-p="moves">MOVE LIST</button><button class="mbtn" data-p="select">CHARACTER SELECT</button><button class="mbtn" data-p="menu">MAIN MENU</button></div></div></div>
+      <!-- story mode ("Hijacked"): story2d.js -->
+      <div id="story" hidden>
+        <button id="smQuit" hidden>☰ SAVE &amp; STORY MAP <small>ESC</small></button>
+        <div class="sp" id="smName" hidden><div class="card smcard"><h2>STORY MODE</h2><p>Type your name and class period. They go on your report card at the end.</p>
+          <label>NAME<input id="smNameIn" maxlength="40" autocomplete="off" spellcheck="false"></label><label>CLASS PERIOD<input id="smPerIn" maxlength="20" autocomplete="off" placeholder="e.g. Period 3"></label>
+          <div class="smrow"><button class="mbtn" id="smNameGo">START</button><button class="mbtn" id="smNameBack">BACK</button></div></div></div>
+        <div class="sp" id="smMap" hidden><div class="smhead"><b>HIJACKED</b><span id="smWho"></span></div><div id="smChaps"></div>
+          <div class="smrow"><button class="mbtn" id="smGo"></button><button class="mbtn" id="smCard">REPORT CARD (PDF)</button><button class="mbtn" id="smReset">NEW STUDENT</button><button class="mbtn" id="smBack">MAIN MENU</button></div></div>
+        <div class="sp" id="smTitle" hidden><div id="smTitleTop"></div><div id="smTitleMain"></div><div class="smtap">PRESS ENTER OR TAP</div></div>
+        <div class="sp" id="smScene" hidden><div id="smBg"></div><div id="smFrame"><div id="smArt"></div><div id="smArtMissing" hidden>ILLUSTRATION COMING SOON</div><div id="smCap" hidden></div></div>
+          <div id="smLine" hidden><div id="smPort"></div><div id="smWhoN"></div><p id="smText"></p><div id="smMore" hidden>▼</div></div></div>
+        <div class="sp" id="smQ" hidden><div class="smqbox"><div class="smqtag"><span id="smQTag"></span><b id="smQWho"></b></div>
+          <div class="smqgrid"><div class="smqL"><canvas id="smQFig" width="1280" height="540"></canvas><p id="smQText"></p></div><div class="smqR"><div id="smQAns"></div><div id="smQFb" class="fb" hidden></div></div></div></div></div>
+        <div class="sp" id="smPre" hidden><div id="smPreL" class="smvs"></div><div class="smpre"><h2 id="smPreN"></h2><p id="smPreP"></p><p class="rule" id="smPreRule"></p><button class="mbtn" id="smPreGo">FIGHT!</button></div><div id="smPreR" class="smvs"></div></div>
+        <div class="sp" id="smPick" hidden><h2>FINALE: CHOOSE YOUR RANGER</h2><p>Any Ranger can fight the Phage. Pick the one you know best.</p><div id="smPickGrid"></div></div>
+        <div class="sp" id="smNext" hidden><div class="card smcard"><h2 id="smNextT"></h2><p id="smNextP"></p><div class="smrow"><button class="mbtn" id="smNextGo">NEXT CHAPTER</button><button class="mbtn" id="smNextStop">SAVE AND QUIT</button></div></div></div>
+        <div class="sp" id="smEnd" hidden><div class="card smcard"><h2>THE CELL IS SAFE!</h2><p>You finished <b>Hijacked</b>. Questions right on the first try:</p><div id="smEndScore"></div><p id="smEndPct"></p>
+          <div class="smrow"><button class="mbtn" id="smEndCard">DOWNLOAD REPORT CARD (PDF)</button><button class="mbtn" id="smEndMap">STORY MAP</button></div></div></div>
+      </div>
+      <div id="smNarr" hidden><b id="smNarrN"></b><p id="smNarrT"></p><div id="smNarrMore" hidden>▶ PRESS ENTER OR TAP TO CONTINUE</div></div>
       <!-- results -->
       <div class="menu res" id="results" hidden><div class="card"><h2 id="resT"></h2><div class="tower" id="towerRow"></div><p id="resP"></p><div class="mlist" id="resList" style="margin:0 auto"></div></div></div>
       <div id="movie"><video id="movieVid" playsinline preload="auto"></video>

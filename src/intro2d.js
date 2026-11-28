@@ -29,7 +29,14 @@ const CINE = {
   },
   /* the clock: the audio's when it's playing, otherwise frame time */
   update(dt) {
-    if (this.music && AUDIO.music === this.music) this.t = Math.max(0, AUDIO.ctx.currentTime - this.music.base); else this.t += dt;
+    // Phones can keep audio paused after the tap (or start it late). Follow the audio clock only while it is actually
+    // running; otherwise run on frame time, and if the music starts behind the picture, restart it where the picture is.
+    const m = this.music, c = AUDIO.ctx;
+    if (m && AUDIO.music === m && c && c.state === "running") {
+      const at = c.currentTime - m.base;
+      if (at < this.t - 0.25) { this.t += dt; this.music = AUDIO.playScore(INTRO_SCORE, this.t, "intro"); }
+      else this.t = Math.max(this.t, at);
+    } else this.t += dt;
     this.frame++; this.draw(VIEW.x, this.t);
     return this.t >= CINE_END;
   },
@@ -38,7 +45,7 @@ const CINE = {
   // (1 = just covers the screen), rot a Dutch tilt. The centre is clamped so the picture always covers the screen.
   shot(g, key, cx, cy, z = 1, rot = 0, o = {}) {
     const im = IIMG[key]; if (!im || !im.naturalWidth) return; const w = im.naturalWidth, h = im.naturalHeight;
-    const s = Math.max(VIEW_W / w, VIEW_H / h) * z * (1 + Math.abs(rot) * 0.8), hw = VIEW_W / 2 / s, hh = (VIEW_H / 2 - (this.lb || 0)) / s; // the letterbox may hide the picture's edge
+    const s = Math.max(VIEW_W / w, VIEW_H / h) * z * (1 + Math.abs(rot) * 1.4), r = Math.abs(Math.sin(rot)), hw = (VIEW_W / 2 + r * VIEW_H / 2) / s, hh = (VIEW_H / 2 - (this.lb || 0) + r * VIEW_W / 2) / s; // the letterbox may hide the picture's edge; a tilt needs a margin
     const px = clamp(cx * w, hw, w - hw), py = clamp(cy * h, hh, h - hh);
     g.save(); g.globalAlpha = o.alpha ?? 1; g.translate(VIEW_W / 2 + (o.ox || 0), VIEW_H / 2 + (o.oy || 0)); g.rotate(rot); g.scale(s, s);
     if (o.smear) { const [dx, dy, n] = o.smear; for (let i = n; i >= 1; i--) { g.globalAlpha = (o.alpha ?? 1) * 0.22; g.drawImage(im, -px - dx * i / s, -py - dy * i / s); } g.globalAlpha = o.alpha ?? 1; }

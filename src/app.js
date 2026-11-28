@@ -124,7 +124,7 @@ const APP = {
     let last = performance.now(), acc = 0;
     const loop = (now) => { const dt = Math.max(0, Math.min(0.1, (now - last) / 1000)); last = now; this.frame(dt); requestAnimationFrame(loop); }; requestAnimationFrame(loop);
     const unlock = () => { AUDIO.init(); AUDIO.on = SET.sound; if (AUDIO.ctx && AUDIO.ctx.state === "suspended") AUDIO.ctx.resume(); if (!AUDIO.music && SET.sound && !["gate", "intro"].includes(this.mode)) AUDIO.startMusic(this.mode === "fight" ? "fight" : "menu"); };
-    addEventListener("keydown", unlock); addEventListener("pointerdown", unlock);
+    addEventListener("keydown", unlock); addEventListener("pointerdown", unlock); addEventListener("touchend", unlock); addEventListener("click", unlock); // iPhones only unlock audio on touchend/click
     addEventListener("keydown", (e) => this.key(e));
   },
   applySettings() { $id("screen").classList.toggle("pixel", SET.pixel); $id("scan").classList.toggle("on", SET.scan); AUDIO.on = SET.sound; if (!SET.sound) AUDIO.stopMusic();
@@ -134,15 +134,15 @@ const APP = {
   /* the intro is a pre-rendered movie (see body.html); the rangers finish loading while it plays */
   /* the story intro is drawn live (intro2d.js). A click-to-start gate comes first: browsers only allow sound after one */
   afterLoad() { if (new URLSearchParams(location.search).has("nomovie")) return this.afterMovie(); this.mode = "gate"; this.screens(null); HUD.show(false); SHOW.setVisible(false); INTRO.show(false);
-    const m = $id("movie"); m.hidden = false; m.classList.remove("out"); $id("movieVid").hidden = true; $id("movieTap").hidden = false; },
+    document.body.classList.add("cine"); const m = $id("movie"); m.hidden = false; m.classList.remove("out"); $id("movieVid").hidden = true; $id("movieTap").hidden = false; },
   fromGate() { $id("movie").hidden = true; AUDIO.init(); AUDIO.on = SET.sound; if (AUDIO.ctx && AUDIO.ctx.state === "suspended") AUDIO.ctx.resume(); this.toIntro(); },
   skipIntro() { INTRO.toLogo(); INTRO.natural = false; this.toPress(); this.setMusic("menu"); },
   logoArt() { if (typeof INTRO_DATA === "undefined" || !INTRO_DATA.logo) return; document.querySelectorAll(".logo2 img.lg").forEach((i) => (i.src = INTRO_DATA.logo));
     document.querySelectorAll(".logo2 .shine").forEach((s) => { s.style.webkitMaskImage = s.style.maskImage = `url(${INTRO_DATA.logo})`; }); },
   afterMovie() { this.endGame(); HUD.show(false); SHOW.setVisible(false); INTRO.show(true); $id("cards").innerHTML = ""; $id("sideMode").textContent = ""; this.toPress(); this.setMusic("menu"); },
   toMovie() { this.toIntro(); },
-  toIntro() { this.endGame(); this.mode = "intro"; this.screens(null); HUD.show(false); SHOW.setVisible(false); INTRO.show(true); AUDIO.stopMusic(); INTRO.start(); $id("cards").innerHTML = ""; $id("sideMode").textContent = ""; $id("skipHint").hidden = false; },
-  toPress() { const natural = this.mode === "intro" && INTRO.natural; this.mode = "press"; this.screens("press"); $id("skipHint").hidden = true; INTRO.toLogo(); const l = $id("press").querySelector(".logo2"); l.classList.remove("in"); void l.offsetWidth; l.classList.add("in"); if (!natural) AUDIO.sfx("boom"); },
+  toIntro() { this.endGame(); this.mode = "intro"; this.screens(null); HUD.show(false); SHOW.setVisible(false); INTRO.show(true); AUDIO.stopMusic(); document.body.classList.add("cine"); INTRO.start(); $id("cards").innerHTML = ""; $id("sideMode").textContent = ""; $id("skipHint").hidden = false; },
+  toPress() { const natural = this.mode === "intro" && INTRO.natural; this.mode = "press"; this.screens("press"); $id("skipHint").hidden = true; document.body.classList.remove("cine"); INTRO.toLogo(); const l = $id("press").querySelector(".logo2"); l.classList.remove("in"); void l.offsetWidth; l.classList.add("in"); if (!natural) AUDIO.sfx("boom"); },
   toTitle() { const fromFight = !!this.game; this.endGame(); this.mode = "title"; this.screens("title"); HUD.show(false); SHOW.setVisible(false); INTRO.show(true); if (INTRO.phase !== "logo") INTRO.toLogo(); this.menuSel("mainList", 0); $id("sideMode").textContent = ""; $id("cards").innerHTML = ""; if (fromFight || !AUDIO.music) this.setMusic("menu"); },
   menuSel(list, i) { const btns = [...$id(list).querySelectorAll(".mbtn")]; this.sel = (i + btns.length) % btns.length; btns.forEach((b, k) => b.classList.toggle("sel", k === this.sel)); this.menuList = list; },
   bindMenus() {

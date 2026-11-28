@@ -130,7 +130,7 @@ def _nb(m):
     """4-neighbour shifts of a mask (no wrap-around)."""
     p = np.pad(m, 1); return p[:-2, 1:-1], p[2:, 1:-1], p[1:-1, :-2], p[1:-1, 2:]
 
-def defringe(rgba, m):
+def defringe(rgba, m, keep_all=False):
     """The generated art was cut from a white background, which can leave a pale, half-transparent rim
     just outside the characters' dark ink outline. Peel that rim back to the ink line (two pixels at
     most). Only pale or soft pixels right next to ink go, so glows, gun flashes and thin parts stay."""

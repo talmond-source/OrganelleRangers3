@@ -78,7 +78,7 @@ function poseFor(me) {
   if (me.buff && me.buff.knot > 0) return { frame: 11, rot: Math.sin(T * 9) * 0.5, pivot: 0.6, scale: 0.6, drop: -0.35 };
   if (PUNCHES.includes(c)) {
     const p = phaseOf(c, f);
-    if (c === "upper") { const up = M(me, "upper"); if (up) return p.wind && p.u < 0.5 ? { frame: 11 } : up; return p.wind ? { frame: p.u < 0.5 ? 11 : 4 } : { frame: 6, rot: -0.75 * (1 - p.u * 0.6), pivot: 0.9 }; }
+    if (c === "upper") { const up = M(me, "upper"); if (up) return p.wind ? (p.u < 0.6 ? E(me, "crouch") || M(me, "jumpCrouch") : M(me, "jumpCrouch")) : p.u < 0.7 ? up : { frame: 7 }; /* dip, spring up, recover */ return p.wind ? { frame: p.u < 0.5 ? 11 : 4 } : { frame: 6, rot: -0.75 * (1 - p.u * 0.6), pivot: 0.9 }; }
     if (c === "throw" && !p.wind && p.u < 0.5) { const t = E(me, "throwRel"); if (t) return t; }
     if (c === "jab") { const j = M(me, "jab"); if (j) return p.wind ? (p.u < 0.5 ? { frame: 4 } : j) : p.u < 0.4 ? { frame: 6 } : p.u < 0.75 ? j : { frame: 4 }; }
     if (p.wind && p.u < 0.45) { const w = M(me, "wind"); if (w) return w; }
@@ -87,9 +87,9 @@ function poseFor(me) {
   }
   if (KICKS.includes(c)) {
     const p = phaseOf(c, f);
-    if (c === "sweep") { const sw = M(me, "sweep"); if (sw) return p.wind && p.u < 0.5 ? (E(me, "crouch") || { frame: 11 }) : sw; return p.wind ? { frame: 11 } : p.u < 0.55 ? { frame: 9, rot: 0.62, pivot: 0.2, drop: 0.12 } : { frame: 11 }; }
-    if (c === "jkick") return M(me, "flykick") || { frame: p.wind && p.u < 0.6 ? 8 : 9, rot: 0.42, pivot: 0.95 };
-    if (c === "kick2" && !p.wind && p.u < 0.55) { const r = M(me, "roundhouse"); if (r) return r; }
+    if (c === "sweep") { const sw = M(me, "sweep"); if (sw) return p.wind && p.u < 0.5 ? (E(me, "crouch") || { frame: 11 }) : !p.wind && p.u > 0.7 ? (E(me, "crouch") || sw) : sw; return p.wind ? { frame: 11 } : p.u < 0.55 ? { frame: 9, rot: 0.62, pivot: 0.2, drop: 0.12 } : { frame: 11 }; }
+    if (c === "jkick") return (p.wind && p.u < 0.4 && M(me, "jumpRise")) || M(me, "flykick") || { frame: p.wind && p.u < 0.6 ? 8 : 9, rot: 0.42, pivot: 0.95 };
+    if (c === "kick2" && (p.wind ? p.u > 0.6 : p.u < 0.55)) { const r = M(me, "roundhouse"); if (r) return r; }
     return { frame: p.wind ? (p.u < 0.75 ? 8 : 9) : p.u < 0.5 ? 9 : 10 };
   }
   if (BLASTS.includes(c)) return LOOKS.palm(me, a, T);

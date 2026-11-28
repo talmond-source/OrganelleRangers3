@@ -8,7 +8,8 @@ const [who, out] = process.argv.slice(2);
 // [label, frames to hold (60 Hz), inputs held, inputs pressed on the first frame, pressed later {frame: input}]
 const PLAN = [['IDLE (breathing)', 80, {}], ['WALK FORWARD', 70, { right: 1 }], ['WALK BACK', 50, { left: 1 }], ['JUMP', 64, { up: 1 }, {}, null, 1],
   ['JAB', 40, {}, { punch: 1 }], ['KICK', 54, {}, { kick: 1 }], ['UPPERCUT (down + punch)', 60, { down: 1 }, { punch: 1 }], ['SWEEP (down + kick)', 66, { down: 1 }, { kick: 1 }],
-  ['JUMP KICK', 70, { up: 1 }, {}, { 12: 'kick' }, 1], ['JUMP PUNCH', 70, { up: 1 }, {}, { 12: 'punch' }, 1]];
+  ['JUMP KICK', 70, { up: 1 }, {}, { 12: 'kick' }, 1], ['JUMP PUNCH', 70, { up: 1 }, {}, { 12: 'punch' }, 1],
+  ['SPECIAL', 70, {}, { special: 1 }], ['SPECIAL + FORWARD', 70, { right: 1 }, { special: 1 }]];
 (async () => {
   fs.mkdirSync(out, { recursive: true });
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1400, height: 800 } });
@@ -19,7 +20,7 @@ const PLAN = [['IDLE (breathing)', 80, {}], ['WALK FORWARD', 70, { right: 1 }], 
   await p.evaluate(() => { window.__hold = true; });
   for (const pass of ['new', 'old']) {
     await p.evaluate(([who, pass]) => {
-      if (pass === 'old' && SPR.motion[who]) { window.__m = SPR.motion[who]; delete SPR.motion[who]; }
+      if (pass === 'old') { if (SPR.flow[who]) delete SPR.flow[who]; else delete SPR.motion[who]; } // before = the newest sheet removed
       APP.gameMode = 'training'; APP.picks = [who, who === 'golgi' ? 'membrane' : 'golgi']; APP.tower = null; APP.startFight('training');
       const g = APP.game; g.skipIntro = true; for (let i = 0; i < 30; i++) g.step(); g.phase = 'fight'; g.timer = 99; const [a, o] = g.f;
       a.x = -2.4; o.x = 3.2; a.face = 1; o.face = -1; a.set('idle'); o.set('idle');

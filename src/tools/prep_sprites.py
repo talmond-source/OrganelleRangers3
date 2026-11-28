@@ -183,10 +183,11 @@ def main():
     for rid in RANGERS:
         sheet, info, scale = atlas(os.path.join(src, rid + '-sheet.png'), 4, 4, TARGET, CELL_W, CELL_H, BASE)
         sheet.save(os.path.join(dst, rid + '.png'), optimize=True); meta[rid] = info
-        # optional new sheets (EXTRA-POSE-PROMPTS.md): <id>-extra.png (fight poses) and <id>-motion.png
-        # (in-between frames). Pose 1 of each is the idle stance, which sets the scale, so the Ranger
-        # comes out the same height whatever size ChatGPT made the picture.
-        for kind in ('extra', 'motion'):
+        # optional new sheets (EXTRA-POSE-PROMPTS.md): <id>-extra.png (fight poses), <id>-motion.png
+        # (in-between frames) and <id>-flow.png (the wind-ups and recoveries around each big attack). Pose 1 of
+        # each is the idle stance, which sets the scale, so the Ranger comes out the same height whatever size
+        # ChatGPT made the picture.
+        for kind in ('extra', 'motion', 'flow'):
             path = os.path.join(src, rid + '-' + kind + '.png')
             if os.path.exists(path):
                 xs, xinfo, _ = atlas(path, 4, 4, TARGET, CELL_W, CELL_H, BASE, pockets=True)
@@ -195,6 +196,10 @@ def main():
         print(rid, 'ok')
     sheet, info, _ = atlas(os.path.join(src, 'phage-sheet.png'), 4, 2, int(TARGET * 1.3), 400, 320, 312)
     sheet.save(os.path.join(dst, 'phage.png'), optimize=True); meta['phage'] = info
+    # the Phage's 16-pose move sheet (faces left like his first sheet; pose 1 is his idle stance)
+    if os.path.exists(os.path.join(src, 'phage-motion.png')):
+        xs, xinfo, _ = atlas(os.path.join(src, 'phage-motion.png'), 4, 4, int(TARGET * 1.3), 400, 320, 312, pockets=True)
+        xs.save(os.path.join(dst, 'phage-motion.png'), optimize=True); meta['phage-motion'] = xinfo; print('phage motion')
     json.dump({'cell': [CELL_W, CELL_H], 'base': BASE, 'target': TARGET, 'phageCell': [400, 320], 'phageBase': 312, 'frames': meta}, open(os.path.join(dst, 'meta.json'), 'w'))
     print('done')
 

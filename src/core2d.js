@@ -60,7 +60,7 @@ const VIEW = {
 };
 
 /* ---------------- sprites: Cell Rescue art, rebuilt at fighting-game scale ---------------- */
-const SPR = { img: {}, port: {}, ready: false, extra: {}, motion: {} };
+const SPR = { img: {}, port: {}, ready: false, extra: {}, motion: {}, flow: {} };
 const FIGHTER_H = 1.85; // metres, idle height
 function loadImage(src) { return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; }); }
 async function loadSprites(progress) {
@@ -70,13 +70,14 @@ async function loadSprites(progress) {
     if (SPRITE_DATA[id + "-portrait"]) SPR.port[id] = await loadImage(SPRITE_DATA[id + "-portrait"]);
     if (SPRITE_DATA[id + "-extra"]) SPR.extra[id] = await loadImage(SPRITE_DATA[id + "-extra"]);
     if (SPRITE_DATA[id + "-motion"]) SPR.motion[id] = await loadImage(SPRITE_DATA[id + "-motion"]);
+    if (SPRITE_DATA[id + "-flow"]) SPR.flow[id] = await loadImage(SPRITE_DATA[id + "-flow"]);
     progress && progress(++n, ids.length);
   }
   SPR.ready = true;
 }
 /* draw one atlas frame with its feet at world (x, y). opts: rot (radians, + = lean forward), pivot height (m), alpha, scale, flip, tint */
 function drawFrame(g, id, frame, x, y, face, o = {}) {
-  const boss = id === "phage", which = o.motion ? "motion" : o.extra ? "extra" : "img", sheet = SPR[which][id]; if (!sheet) return;
+  const boss = id === "phage", which = o.flow ? "flow" : o.motion ? "motion" : o.extra ? "extra" : "img", sheet = SPR[which][id]; if (!sheet) return;
   const cw = boss ? SPRITE_META.phageCell[0] : SPRITE_META.cell[0], ch = boss ? SPRITE_META.phageCell[1] : SPRITE_META.cell[1], base = boss ? SPRITE_META.phageBase : SPRITE_META.base;
   const cols = 4, sx = (frame % cols) * cw, sy = Math.floor(frame / cols) * ch;
   const px = VIEW.S * FIGHTER_H / SPRITE_META.target * (o.scale || 1);

@@ -128,7 +128,7 @@ class Fighter {
       }
       case "jump": {
         if (pr.kick && !this.move) this.startMove(MELEE.jkick); else if (pr.punch && !this.move) this.startMove(MELEE.jpunch);
-        if (this.grounded && this.st > 3) { this.set("idle"); this.vx = 0; g.parts.dust(V3(this.x, 0, 0), 4); }
+        if (this.grounded && this.st > 3) { this.set("idle"); this.landT = g.time; this.vx = 0; g.parts.dust(V3(this.x, 0, 0), 4); }
         break;
       }
       case "attack": this.runMove(); break;
